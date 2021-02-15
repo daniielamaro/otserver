@@ -1,44 +1,17 @@
-# OTServ Brasil - Global Server
+1. Compiled:
+	* x32 (visual studio): https://github.com/Fir3element/binaries/raw/master/x32.rar
+	* x32 (dev-cpp): https://github.com/Fir3element/binaries/raw/master/x32_dev.rar
+	* x64 (visual studio): https://github.com/Fir3element/binaries/raw/master/x64.rar
 
-## Builds
-[![Build status](https://ci.appveyor.com/api/projects/status/github/opentibiabr/otservbr-global?branch=develop&passingText=develop%20-%20OK&svg=true)](https://ci.appveyor.com/project/opentibiabr/otservbr-global "Download nightly builds for Windows")
-[![Build Status](https://travis-ci.org/opentibiabr/OTServBR-Global.svg?branch=develop)](https://travis-ci.org/opentibiabr/OTServBR-Global "Linux Build Status - Develop Branch")
+2. Source: https://github.com/Fir3element/3777/archive/master.zip
 
-[![Build on MacOS](https://github.com/opentibiabr/otservbr-global/workflows/Build%20on%20MacOS/badge.svg)](https://github.com/opentibiabr/otservbr-global/actions?query=workflow%3A%22Build+on+MacOS%22)
-[![Build on Ubuntu](https://github.com/opentibiabr/otservbr-global/workflows/Build%20on%20Ubuntu/badge.svg)](https://github.com/opentibiabr/otservbr-global/actions?query=workflow%3A%22Build+on+Ubuntu%22)
-[![Build on Windows](https://github.com/opentibiabr/otservbr-global/workflows/Build%20on%20Windows/badge.svg)](https://github.com/opentibiabr/otservbr-global/actions?query=workflow%3A%22Build+on+Windows%22)
+3. Dev-cpp: https://github.com/Fir3element/binaries/raw/master/dev-cpp.rar
 
-## Docs/Help
-[![Documentation](https://codedocs.xyz/Costallat/otservbr-global.svg)](https://codedocs.xyz/Costallat/otservbr-global/)
-[![Discord Channel](https://img.shields.io/discord/528117503952551936.svg?label=discord)](https://discord.gg/3NxYnyV)
+4. MSVC10 libs and includes: https://github.com/Fir3element/binaries/raw/master/vc10_pack.rar
 
-## Project
-OTServ Brasil - Global Server is a free and open-source MMORPG server emulator written in C++. It is a fork of the [Forgotten Server](https://github.com/otland/forgottenserver) project. To connect to the server and to take a stable experience, you can use our [own client](https://forums.otserv.com.br/index.php?/forums/topic/167933-otservbr-global-cliente-tibia-12/) and if you want to edit something, check our [customized tools](https://github.com/opentibiabr/tools).
-
-### Getting Started
-* **WARNING: YOU NEED TO UNZIP THE MAP BEFORE START THE SERVER.**
-* [Compiling on Windows](https://forums.otserv.com.br/index.php?/forums/topic/169235-windowsvc2019-compilando-sources-otservbr-global/), alternatively download [nightly builds for Windows](https://ci.appveyor.com/project/opentibiabr/otservbr-global).
-
-### Issues
-We use the [issue tracker on GitHub](https://github.com/opentibiabr/OTServBR-Global/issues). Keep in mind that everyone who is watching the repository gets notified by e-mail when there is an activity, so be thoughtful and avoid writing comments that aren't meant for an issue (e.g. "+1"). If you'd like for an issue to be fixed faster, you should either fix it yourself and submit a pull request, or place a bounty on the issue.
-
-### Special Thanks
-- our partners
-- our crew (majesty, gpedro, eduardo dantas)
-- our testers (raphaellb, petardako, szulcek and olimpotibia)
-- [our contributors](https://github.com/opentibiabr/OTServBR-Global/graphs/contributors)
-- [fear lucien](https://github.com/FearLucien)
-- [cjaker](https://github.com/Eternal-Scripts)
-- [slavidodo](https://github.com/slavidodo)
-- [mignari and our awesome tools](https://github.com/ottools)
-- [mattyx14/otxserver](https://github.com/mattyx14/otxserver) and contributors.
-- [otland/forgottenserver](https://github.com/otland/forgottenserver) and contributors.
-- if we forget someone, we apologize by forgot you. but you know, **forgot**tenserver.
-
-### Sponsors
-If you want to sponsor here, join on discord and send a message for one of our administrators.
-
-### Partners
-[![Supported by OTServ Brasil](https://forums.otserv.com.br/uploads/monthly_2018_05/otbr.png.9f34d819278e170c73dd155a0ca1b501.png)](https://forums.otserv.com.br)
-
-[![Protected by ServerCore](https://mktsc.servercore.com.br/protectedbyservercore.png)](https://bit.ly/1q2q4de)
+5. Compile on linux:
+	* apt-get install autoconf build-essential pkg-config automake libboost-all-dev libgmp3-dev libxml2-dev liblua5.1-0-dev libmysqlclient-dev libssl-dev libsqlite3-dev
+	* cd /3777-master
+	* chmod -R 777 src
+	* cd src
+	* ./autogen.sh && ./configure --enable-sqlite --enable-mysql --enable-root-permission --enable-server-diag && ./build.sh
