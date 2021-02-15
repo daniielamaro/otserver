@@ -16,18 +16,18 @@ local function executeSave(seconds)
 			text = "S"
 		end
 
-		text = text .. "erver save within " .. seconds .. " seconds, please mind it may freeze!"
+		text = text .. "erver Vai Ser Salvo Em " .. seconds .. " Seg, Save Server!"
 		doBroadcastMessage(text)
 	end
 
 	if(seconds > 0) then
-		addEvent(executeSave, config.events * 1000, seconds - config.events)
+		addEvent(executeSave, config.events * 1, seconds - config.events)
 	else
 		doSaveServer(config.shallow)
 	end
 end
 
-function onThink(interval)
+function onThink(interval, lastExecution, thinkInterval)
 	if(table.maxn(config.broadcast) == 0) then
 		doSaveServer(config.shallow)
 	else

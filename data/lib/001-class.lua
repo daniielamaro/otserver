@@ -39,3 +39,5 @@ function createClass(parent)
 
 	return newClass
 end
+
+dofile(getDataDir() .. "lib/arena.lua")

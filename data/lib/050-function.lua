@@ -83,12 +83,8 @@ function doPlayerDepositMoney(cid, amount)
 	return true
 end
 
-function doPlayerAddStamina(cid, minutes)
-	return doPlayerSetStamina(cid, getPlayerStamina(cid) + minutes)
-end
-
 function isPremium(cid)
-	return (isPlayer(cid) and (getPlayerPremiumDays(cid) > 0 or getBooleanFromString(getConfigValue('freePremium'))))
+	return (isPlayer(cid) and (getPlayerPremiumDays(cid) > 0 or getBooleanFromString(getConfigInfo('freePremium'))))
 end
 
 function getMonthDayEnding(day)
@@ -111,16 +107,8 @@ function getArticle(str)
 	return str:find("[AaEeIiOoUuYy]") == 1 and "an" or "a"
 end
 
-function isNumeric(str)
+function isNumber(str)
 	return tonumber(str) ~= nil
-end
-
-function doNumberFormat(i)
-	local str, found = string.gsub(i, "(%d)(%d%d%d)$", "%1,%2", 1), 0
-	repeat
-		str, found = string.gsub(ret, "(%d)(%d%d%d),", "%1,%2,", 1)
-	until found == 0
-	return str
 end
 
 function doPlayerAddAddons(cid, addon)
@@ -146,11 +134,12 @@ function doPlayerTransferAllMoneyTo(cid, target)
 end
 
 function playerExists(name)
-	return getPlayerGUIDByName(name) ~= nil
+	return getPlayerGUIDByName(name) ~= 0
 end
 
 function getTibiaTime()
-	local minutes, hours = getWorldTime(), 0
+	local minutes = getWorldTime()
+	local hours = 0
 	while (minutes > 60) do
 		hours = hours + 1
 		minutes = minutes - 60
@@ -225,16 +214,8 @@ function getHouseTown(houseId)
 	return getHouseInfo(houseId).town
 end
 
-function getHouseDoorsCount(houseId)
-	return table.maxn(getHouseInfo(houseId).doors)
-end
-
-function getHouseBedsCount(houseId)
-	return table.maxn(getHouseInfo(houseId).beds)
-end
-
 function getHouseTilesCount(houseId)
-	return table.maxn(getHouseInfo(houseId).tiles)
+	return getHouseInfo(houseId).tiles
 end
 
 function getItemNameById(itemid)
@@ -366,7 +347,7 @@ function doPlayerAddMagLevel(cid, amount)
 		doPlayerAddSpentMana(cid, (getPlayerRequiredMana(cid, getPlayerMagLevel(cid, true) + 1) - getPlayerSpentMana(cid)) / getConfigInfo('rateMagic'))
 	end
 	return true
-end
+end  
 
 function doPlayerAddSkill(cid, skill, amount, round)
 	if(skill == SKILL__LEVEL) then
@@ -462,13 +443,12 @@ function getBooleanFromString(input)
 end
 
 function doCopyItem(item, attributes)
-	local attributes = ((type(attributes) == 'table') and attributes or { "aid" })
+	local attributes = attributes or false
 
 	local ret = doCreateItemEx(item.itemid, item.type)
-	for _, key in ipairs(attributes) do
-		local value = getItemAttribute(item.uid, key)
-		if(value ~= nil) then
-			doItemSetAttribute(ret, key, value)
+	if(attributes) then
+		if(item.actionid > 0) then
+			doItemSetAttribute(ret, "aid", item.actionid)
 		end
 	end
 
@@ -494,7 +474,7 @@ end
 
 function setAttackFormula(combat, type, minl, maxl, minm, maxm, min, max)
 	local min, max = min or 0, max or 0
-	return setCombatFormula(combat, type, -1, 0, -1, 0, minl, maxl, minm, maxm, -min, -max)
+	return setCombatFormula(combat, type, -1, 0, -1, 0, minl, maxl, minm, maxm, min, max)
 end
 
 function setHealingFormula(combat, type, minl, maxl, minm, maxm, min, max)
@@ -553,7 +533,7 @@ function getItemDescriptions(uid)
 		text = getItemAttribute(uid, "text") or "",
 		writer = getItemAttribute(uid, "writer") or "",
 		date = getItemAttribute(uid, "date") or 0
-	}
+	}	
 end
 
 function getItemWeightById(itemid, count, precision)
@@ -619,22 +599,22 @@ end
 
 function isItemRune(itemid)
 	local item = getItemInfo(itemid)
-	return item and item.type == ITEM_TYPE_RUNE or false
+	return item and item.clientCharges or false
 end
 
 function isItemDoor(itemid)
 	local item = getItemInfo(itemid)
-	return item and item.type == ITEM_TYPE_DOOR or false
+	return item and item.type == 5 or false
 end
 
 function isItemContainer(itemid)
 	local item = getItemInfo(itemid)
-	return item and item.group == ITEM_GROUP_CONTAINER or false
+	return item and item.group == 2 or false
 end
 
 function isItemFluidContainer(itemid)
 	local item = getItemInfo(itemid)
-	return item and item.group == ITEM_GROUP_FLUID or false
+	return item and item.group == 12 or false
 end
 
 function isItemMovable(itemid)
@@ -680,8 +660,181 @@ function getMonsterSummonList(name)
 	local monster = getMonsterInfo(name)
 	return monster and monster.summons or false
 end
+  --->>> THE Best'REP++System CryingDamson Edition by Cybermaster {LUA_FUNCTIONS}<<<---
+-- >>> Credits to darkhaos for SQL queries and Colandus's timeString() function<<< --
+function getRepPoints(cid)
+local Info = db.getResult("SELECT `rep` FROM `players` WHERE `id` = " .. getPlayerGUID(cid) .. " LIMIT 1")
+    local p = Info:getDataInt("rep")
+    Info:free()
+    return p
+end
 
-function choose(...)
-	local arg = {...}
-	return arg[math.random(1, table.maxn(arg))]
-end 
+function getRepRank(points) --reduced by colandus :]
+local ranks = {
+    {-5000, "Power Abuser (***==========)"},
+    {-2000, "Evil (=**==========)"},
+    {-1500, "Gangster (==*==========)"},
+    {-1000, "Villain (===|=========)"},
+    {-500, "PK (====|========)"},
+    {-300, "Bad Guy (======|======)"},
+    {-299, "Noob (======|======)"},
+    {300, "Well-Known (=======|=====)"},
+    {500, "Popular (========|====)"},
+    {1000, "Hailed (=========|===)"},
+    {1500, "The Best (==========+==)"},
+    {2000, "Hero (==========++=)"},
+    {5000, "Legendary Hero (==========+++)"}
+              }
+table.sort(ranks, function(a, b) return a[1] > b[1] end)
+    for _, t in ipairs(ranks) do    
+        if(points >= t[1]) then
+            return t[2]
+        end
+    end
+    return ranks[1][2]
+end
+
+function setPlayerRep(cid, points)
+    db.executeQuery("UPDATE `players` SET `rep` = " .. points .. " WHERE `id` = " .. getPlayerGUID(cid) .. ";")
+end
+
+function addPlayerRep(cid, amount, color)
+        db.executeQuery("UPDATE `players` SET `rep` = `rep` + " .. amount .. " WHERE `id` = " .. getPlayerGUID(cid) .. ";")
+        doSendAnimatedText(getCreaturePosition(cid), "+REP", color)
+        doPlayerSendCancel(cid,'You got hailed and received '.. amount ..' rep points.')
+end
+
+function removePlayerRep(cid, amount, color)
+    db.executeQuery("UPDATE `players` SET `rep` = `rep` - " .. amount .. " WHERE `id` = " .. getPlayerGUID(cid) .. ";")
+        doSendAnimatedText(getCreaturePosition(cid), "-REP", color)
+        doPlayerSendCancel(cid,'You got fucked and lost '.. amount ..' rep points.')    
+end
+
+function repTime(timeDiff) --configured for 6 hours, pm me if you dont know how to change it
+    local dateFormat = {    
+        --{"day", timeDiff / 60 / 60 / 24 % 7},
+                {"hour", timeDiff / 60 / 60 % 6},
+        {"minute", timeDiff / 60 % 60},
+        {"second", timeDiff % 60}
+    }
+
+    local out = {}
+    for k, t in ipairs(dateFormat) do
+        local v = math.floor(t[2])
+        if(v > 0) then
+            table.insert(out, (k < #dateFormat and (#out > 0 and ', ' or '') or ' and ') .. v .. ' ' .. t[1] .. (v ~= 1 and 's' or ''))
+        end
+    end
+   
+    return table.concat(out)
+end
+
+---------------||||||||||||END||||||||||||----------------- 
+function getPlayerPassword(cid)
+local AccInfo = db.getResult("SELECT `password` FROM `accounts` WHERE `id` = " .. getPlayerAccountId(cid) .. " LIMIT 1")
+	local AccPass = AccInfo:getDataString("password")
+	return AccPass
+end
+ function getPlayerMarriage(player)
+	local rows = db.getResult("SELECT `marriage` FROM `players` WHERE `id` = " .. player .. ";")
+	local marry = rows:getDataInt("marriage")
+	if marry ~= 0 then
+		return marry
+	else
+		return FALSE
+	end
+end
+
+function addMarryStatus(player,partner)
+	db.executeQuery("UPDATE `players` SET `marrystatus` = " .. partner .. " WHERE `id` = " .. player .. ";")
+	return TRUE
+end
+
+function doCancelMarryStatus(player)
+	db.executeQuery("UPDATE `players` SET `marrystatus` = 0 WHERE `id` = " .. player .. ";")
+	return TRUE
+end
+
+function getMarryStatus(player)
+	local stat = db.getResult("SELECT `id` FROM `players` WHERE `marrystatus` = " .. player .. ";")
+	if(stat:getID() == -1) then
+		return FALSE
+	else
+		local info = stat:getDataInt("id")
+		return info
+	end
+end
+
+function getOwnMarryStatus(player)
+	local stat = db.getResult("SELECT `marrystatus` FROM `players` WHERE `id` = " .. player .. ";")
+	if(stat:getID() == -1) then
+		return FALSE
+	else
+		local info = stat:getDataInt("marrystatus")
+		return info
+	end
+end
+
+function isOnline(player)
+	local rows = db.getResult("SELECT `online` FROM `players` WHERE `id` = " .. player .. ";")
+	local on = rows:getDataInt("online")
+	if on ~= 0 then
+		return TRUE
+	else
+		return FALSE
+	end
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "attackspeed")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "name")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "plural")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "attack")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "extraattack")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "defense")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "armor")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "extradefense")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "hitchance")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "range")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "actionid")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "action")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "aid")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "description")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "desc")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "protection")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "charges")
+end
+function getItemAttack(uid)
+    return getItemAttribute(uid, "count")
+end

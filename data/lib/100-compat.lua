@@ -1,8 +1,6 @@
 --[[
  * File containing deprecated functions and constants used by alot of scripts and other engines
 ]]--
---bit = require("bit")
-
 TRUE = true
 FALSE = false
 LUA_ERROR = false
@@ -54,10 +52,6 @@ STACKPOS_FIFTH_ITEM_ABOVE_GROUNDTILE = 5
 WORLD_TYPE_NO_PVP = 1
 WORLD_TYPE_PVP = 2
 WORLD_TYPE_PVP_ENFORCED = 3
-
-WORLDTYPE_NO_PVP = 1
-WORLDTYPE_PVP = 2
-WORLDTYPE_PVP_ENFORCED = 3
 
 CHANNEL_STAFF = 2
 CHANNEL_COUNSELOR = 4
@@ -151,10 +145,7 @@ hasClient = hasPlayerClient
 print = std.cout
 getPosByDir = getPositionByDirection
 db.updateQueryLimitOperator = db.updateLimiter
-db.stringComparisonOperator = db.stringComparer
-db.stringComparison = db.stringComparer
-db.executeQuery = db.query
-isNumber = isNumeric
+db.stringComparisonOperator = db.stringComparison
 
 PlayerFlag_CannotUseCombat = 0
 PlayerFlag_CannotAttackPlayer = 1
@@ -203,7 +194,6 @@ PlayerFlag_CannotMoveCreatures = 43
 PlayerFlag_CanReportBugs = 44
 PlayerFlag_45 = 45 -- ignore
 PlayerFlag_CannotBeSeen = 46
-PlayerFlag_HideHealth = 47
 
 PlayerCustomFlag_AllowIdle = 0
 PlayerCustomFlag_CanSeePosition	= 1
@@ -223,8 +213,8 @@ PlayerCustomFlag_IsProtected = 14
 PlayerCustomFlag_IsImmune = 15
 PlayerCustomFlag_NotGainSkull = 16
 PlayerCustomFlag_NotGainUnjustified = 17
-PlayerCustomFlag_IgnorePacification = 18
-PlayerCustomFlag_IgnoreLoginDelay = 19
+PlayerCustomFlag_HideLevel = 18
+PlayerCustomFlag_IgnorePacification = 19
 PlayerCustomFlag_CanStairhop = 20
 PlayerCustomFlag_CanTurnhop = 21
 PlayerCustomFlag_IgnoreHouseRent = 22

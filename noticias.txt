@@ -1,0 +1,21 @@
+Bem Vindo ao Baiak24h
+Editado por Dih e Drézin
+
+novos comandos:
+!attackguild on
+!attrackguild off
+!reparar soft
+!reparar firewalker
+!glist
+!glist (nome da guild)
+!party (muda outfit da party)
+!changeoutfit (muda outfit da guild)
+!topkill
+/commands
+
+System de mount
+Zombie Event
+Woe Event
+e muitos mais
+
+bom jogo

@@ -1,20 +1,11 @@
 local config = {
-	loginMessage = getConfigValue('loginMessage'),
-	useFragHandler = getBooleanFromString(getConfigValue('useFragHandler'))
+	loginMessage = getConfigValue('loginMessage')
 }
 
 function onLogin(cid)
 	local loss = getConfigValue('deathLostPercent')
-	if(loss ~= nil and getPlayerStorageValue(cid, "bless") ~= 5) then
+	if(loss ~= nil) then
 		doPlayerSetLossPercent(cid, PLAYERLOSS_EXPERIENCE, loss * 10)
-	end
-
-	if(getPlayerStorageValue(cid, "death_bless") == 1) then
-		local t = {PLAYERLOSS_EXPERIENCE, PLAYERLOSS_SKILLS, PLAYERLOSS_ITEMS, PLAYERLOSS_CONTAINERS}
-		for i = 1, #t do
-			doPlayerSetLossPercent(cid, t[i], 100)
-		end
-		setPlayerStorageValue(cid, "death_bless", 0)
 	end
 
 	local accountManager = getPlayerAccountManager(cid)
@@ -43,13 +34,53 @@ function onLogin(cid)
 
 	registerCreatureEvent(cid, "Mail")
 	registerCreatureEvent(cid, "GuildMotd")
+	
+registerCreatureEvent(cid, "killer")
+registerCreatureEvent(cid, "Idle")
 
-	registerCreatureEvent(cid, "Idle")
-	if(config.useFragHandler) then
-		registerCreatureEvent(cid, "SkullCheck")
-	end
+registerCreatureEvent(cid, "attackguild")	
+registerCreatureEvent(cid, "advance")
+registerCreatureEvent(cid, "FimVip")
 
-	registerCreatureEvent(cid, "ReportBug")
-	registerCreatureEvent(cid, "AdvanceSave")
-	return true
+registerCreatureEvent(cid, "forever amulet")
+registerCreatureEvent(cid, "SkullCheck")
+	
+registerCreatureEvent(cid, "ReportBug")
+
+registerCreatureEvent(cid, "PlayerKill")
+registerCreatureEvent(cid, "onPrepareDeath")
+registerCreatureEvent(cid, "ZombieAttack")
+registerCreatureEvent(cid, "TopFrags")
+    if (InitArenaScript ~= 0) then
+    InitArenaScript = 1
+    -- make arena rooms free
+        for i = 42300, 42309 do
+            setGlobalStorageValue(i, 0)
+            setGlobalStorageValue(i+100, 0)
+        end
+    end
+    -- if he did not make full arena 1 he must start from zero
+    if getPlayerStorageValue(cid, 42309) < 1 then
+        for i = 42300, 42309 do
+            setPlayerStorageValue(cid, i, 0)
+        end
+    end
+    -- if he did not make full arena 2 he must start from zero
+    if getPlayerStorageValue(cid, 42319) < 1 then
+        for i = 42310, 42319 do
+            setPlayerStorageValue(cid, i, 0)
+        end
+    end
+    -- if he did not make full arena 3 he must start from zero
+    if getPlayerStorageValue(cid, 42329) < 1 then
+        for i = 42320, 42329 do
+            setPlayerStorageValue(cid, i, 0)
+        end
+    end
+    if getPlayerStorageValue(cid, 42355) == -1 then
+        setPlayerStorageValue(cid, 42355, 0) -- did not arena level
+    end
+    setPlayerStorageValue(cid, 42350, 0) -- time to kick 0
+    setPlayerStorageValue(cid, 42352, 0) -- is not in arena 
+return true
 end
