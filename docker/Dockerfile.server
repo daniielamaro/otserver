@@ -31,6 +31,6 @@ RUN cp config.lua.dist config.lua \
   && sed -i '/mysqlUser = .*$/c\mysqlUser = "otserver"' config.lua \
   && sed -i '/mysqlPass = .*$/c\mysqlPass = "otserver"' config.lua \
   && sed -i '/mysqlDatabase = .*$/c\mysqlDatabase = "otserver"' config.lua \
-  && unzip -o data/world.zip -d data/world/
+  && unzip -o data/world.zip -d data/
 
 ENTRYPOINT /opt/otserver/otbr
