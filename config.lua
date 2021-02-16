@@ -95,7 +95,7 @@ checkExpiredMarketOffersEachMinutes = 60
 maxMarketOffersAtATimePerPlayer = 100
 
 -- MySQL
-mysqlHost = "otdb"
+mysqlHost = "localhost"
 mysqlUser = "otserver"
 mysqlPass = "otserver"
 mysqlDatabase = "otserver"
