@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<npc name="Perac" script="data/npc/scripts/default.lua" walkinterval="2000" floorchange="0">
+<npc name="Perac" walkinterval="2000" floorchange="0" script="perac.lua">
 	<health now="100" max="100"/>
-	<look type="134" head="57" body="59" legs="40" feet="76" corpse="2212"/>
+	<look type="129" head="78" body="90" legs="68" feet="114" addons="0"/>
 	<parameters>
 		<parameter key="module_shop" value="1"/>
-		<parameter key="message_greet" value="Hello |PLAYERNAME|. I sell bows and amunations, just {trade}."/>
-		<parameter key="shop_sellable" value="crossbow,2455,150;bow,2456,130" />
-		<parameter key="shop_buyable" value="crossbow,2455,360;bow,2456,200;spear,2389,10;royal spear,7378,15;power bolt,2547,200;burst arrow,2546,56;poison arrow,2545,18;bolt,2543,3;arrow,2544,2;assassin star,7368,100" />
+		<parameter key="shop_buyable" value="arrow,2544,3;bolt,2543,4;bow,2456,400;crossbow,2455,500;spear,2389,10;"/>
+		<parameter key="shop_sellable" value="spear,2389,3;"/>
+		<parameter key="message_greet" value="Oh, please come in, |PLAYERNAME|. What do you need? Distance weapons? I sell lots of them."/>
+		<parameter key="message_sendtrade" value="Here you go."/>
 	</parameters>
 </npc>

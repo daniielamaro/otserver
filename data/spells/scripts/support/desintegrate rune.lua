@@ -1,28 +1,25 @@
-local function doRemoveObject(cid, pos)
-	pos.stackpos = 255
-	local object = getThingFromPos(pos)
-	if(object.uid > 65535 and not isCreature(object.uid) and isMovable(object.uid) and object.actionid == 0 and not getTileInfo(pos).protection) then
-		doRemoveItem(object.uid)
-		doSendMagicEffect(pos, CONST_ME_BLOCKHIT)
-		return true
+local corpseIds = {3058, 3059, 3060, 3061, 3064, 3065, 3066}
+local removalLimit = 500
+
+function onCastSpell(creature, variant, isHotkey)
+	local position = variant:getPosition()
+	local tile = Tile(position)
+	if tile then
+		local items = tile:getItems()
+		if items then
+			for i, item in ipairs(items) do
+				if item:getType():isMovable() and item:getUniqueId() > 65535 and item:getActionId() == 0 and not table.contains(corpseIds, item:getId()) then
+					item:remove()
+				end
+
+				if i == removalLimit then
+					break
+				end
+			end
+		end
 	end
 
-	doPlayerSendDefaultCancel(cid, RETURNVALUE_NOTPOSSIBLE)
-	doSendMagicEffect(getPlayerPosition(cid), CONST_ME_POFF)
-	return false
-end
-
-function onCastSpell(cid, var)
-	local pos = variantToPosition(var)
-	if(pos.x == CONTAINER_POSITION) then
-		pos = getThingPos(cid)
-	end
-
-	if(pos.x ~= 0 and pos.y ~= 0) then
-		return doRemoveObject(cid, pos)
-	end
-
-	doPlayerSendDefaultCancel(cid, RETURNVALUE_NOTPOSSIBLE)
-	doSendMagicEffect(getPlayerPosition(cid), CONST_ME_POFF)
-	return false
+	creature:sendCancelMessage(RETURNVALUE_NOTPOSSIBLE)
+	position:sendMagicEffect(CONST_ME_POFF)
+	return true
 end

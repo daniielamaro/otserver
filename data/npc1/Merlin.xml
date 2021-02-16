@@ -1,7 +1,0 @@
-<npc name="Merlin" script="data/npc/scripts/bless.lua" floorchange="0" access="5" level="1" maglevel="1">
-	<health now="150" max="150"/>
-	<look type="130" head="0" body="0" legs="0" feet="0" addons="3" corpse="2212"/>
-	<parameters>
-		<parameter key="message_greet" value="Ola |PLAYERNAME|. ! Vendo {Bless 1, 2, 3, 4 e 5}..." />
-	</parameters>
-</npc>

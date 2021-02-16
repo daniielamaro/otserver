@@ -1,1 +1,0 @@
-dofile(getDataDir() .. "lib/arena.lua")

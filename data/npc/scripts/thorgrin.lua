@@ -2,25 +2,35 @@ local keywordHandler = KeywordHandler:new()
 local npcHandler = NpcHandler:new(keywordHandler)
 NpcSystem.parseParameters(npcHandler)
 
+function onCreatureAppear(cid)
+	npcHandler:onCreatureAppear(cid)
+end
+function onCreatureDisappear(cid)
+	npcHandler:onCreatureDisappear(cid)
+end
+function onCreatureSay(cid, type, msg)
+	npcHandler:onCreatureSay(cid, type, msg)
+end
+function onThink()
+	npcHandler:onThink()
+end
 
+local voices = { {text = 'Ask me for a passage...'} }
+npcHandler:addModule(VoiceModule:new(voices))
 
--- OTServ event handling functions start
-function onCreatureAppear(cid)				npcHandler:onCreatureAppear(cid) end
-function onCreatureDisappear(cid) 			npcHandler:onCreatureDisappear(cid) end
-function onCreatureSay(cid, type, msg) 	npcHandler:onCreatureSay(cid, type, msg) end
-function onThink() 						npcHandler:onThink() end
--- OTServ event handling functions end
+-- Travel
+local function addTravelKeyword(keyword, cost, destination)
+	local travelKeyword = keywordHandler:addKeyword({keyword}, StdModule.say, {npcHandler = npcHandler, text = 'Do you seek a ride to ' .. keyword:titleCase() .. ' for |TRAVELCOST|?', cost = cost, discount = 'postman'})
+		travelKeyword:addChildKeyword({'yes'}, StdModule.travel, {npcHandler = npcHandler, premium = false, cost = cost, discount = 'postman', destination = destination})
+		travelKeyword:addChildKeyword({'no'}, StdModule.say, {npcHandler = npcHandler, text = 'Then not.', reset = true})
+end
 
+addTravelKeyword('kazordoon', 210, Position(32659, 31957, 15))
+addTravelKeyword('cormaya', 110, Position(33310, 31988, 15))
 
+keywordHandler:addKeyword({'passage'}, StdModule.say, {npcHandler = npcHandler, text = "Do you want me take you to {Cormaya} or {Kazordoon}?"})
 
--- Don't forget npcHandler = npcHandler in the parameters. It is required for all StdModule functions!
-local travelNode = keywordHandler:addKeyword({'dorion'}, StdModule.say, {npcHandler = npcHandler, onlyFocus = true, text = 'Quer gastar 300 Gps em uma viagem para Dorion?'})
-	travelNode:addChildKeyword({'yes'}, StdModule.travel, {npcHandler = npcHandler, premium = true, level = 10, cost = 300, destination = {x=200, y=82, z=6} })
-	travelNode:addChildKeyword({'no'}, StdModule.say, {npcHandler = npcHandler, onlyFocus = true, reset = true, text = 'Vai ficar?'})
-
-keywordHandler:addKeyword({'destination'}, StdModule.say, {npcHandler = npcHandler, onlyFocus = true, text = 'Eu posso te levar para {dorion}.'})
-
-
-
--- Makes sure the npc reacts when you say hi, bye etc.
+npcHandler:setMessage(MESSAGE_GREET, "Welcome, |PLAYERNAME|! May earth protect you on the rocky grounds. If you need a {passage} back, I can help you.")
+npcHandler:setMessage(MESSAGE_FAREWELL, "Good bye.")
+npcHandler:setMessage(MESSAGE_WALKAWAY, "Good bye then.")
 npcHandler:addModule(FocusModule:new())

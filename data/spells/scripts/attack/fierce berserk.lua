@@ -1,17 +1,22 @@
-local combat = createCombatObject()
-setCombatParam(combat, COMBAT_PARAM_TYPE, COMBAT_PHYSICALDAMAGE)
-setCombatParam(combat, COMBAT_PARAM_EFFECT, CONST_ME_HITAREA)
-setCombatParam(combat, COMBAT_PARAM_USECHARGES, true)
+local combat = Combat()
+combat:setParameter(COMBAT_PARAM_TYPE, COMBAT_PHYSICALDAMAGE)
+combat:setParameter(COMBAT_PARAM_EFFECT, CONST_ME_HITAREA)
+combat:setParameter(COMBAT_PARAM_BLOCKARMOR, 1)
+combat:setParameter(COMBAT_PARAM_USECHARGES, 1)
+combat:setArea(createCombatArea(AREA_SQUARE1X1))
 
-local area = createCombatArea(AREA_SQUARE1X1)
-setCombatArea(combat, area)
+function onGetFormulaValues(player, skill, attack, factor)
+	local level = player:getLevel()
+	
+	local min = (level / 5) + (skill + 2 * attack) * 1.1
+	local max = (level / 5) + (skill + 2 * attack) * 3
 
-function onGetFormulaValues(cid, level, skill, attack, factor)
-	local skillTotal, levelTotal = skill + attack * 2, level / 5
-	return -(skillTotal * 1.1 + levelTotal), -(skillTotal * 3 + levelTotal)
+	return -min, -max
 end
 
-setCombatCallback(combat, CALLBACK_PARAM_SKILLVALUE, "onGetFormulaValues")
-function onCastSpell(cid, var)
-	return doCombat(cid, combat, var)
+
+combat:setCallback(CALLBACK_PARAM_SKILLVALUE, "onGetFormulaValues")
+
+function onCastSpell(creature, var)
+	return combat:execute(creature, var)
 end

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<npc name="Prezil" script="data/npc/scripts/default.lua" walkinterval="2000" floorchange="0">
-	<health now="185" max="185"/>
-    <look type="66" head="0" body="0" legs="0" feet="0" addons="0"/>
+<npc name="Prezil" walkinterval="2000" floorchange="0" script="prezil.lua">
+	<health now="100" max="100"/>
+	<look type="66"/>
 	<parameters>
-		<parameter key="message_greet" value="Hello there!"/>
-		<parameter key="message_farewall" value="Good bye!"/>
-		<parameter key="message_walkaway" value="Good bye then!"/>
-	</parameters>
+     		<parameter key="message_greet" value="Welcome, adventurer |PLAYERNAME|! What brings you here?"/>
+      		<parameter key="message_farewell" value="Farewell, Lepperix!"/>
+		<parameter key="message_walkaway" value="Farewell, Lepperix!"/>
+ 	</parameters>
 </npc>
