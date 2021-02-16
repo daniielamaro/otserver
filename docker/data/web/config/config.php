@@ -44,7 +44,7 @@ $config['site']['sqlPass'] = "";
 $config['site']['sqlBD'] = "ot";
 
 # Account Maker Config
-$config['site']['serverPath'] = "/otserver/";
+$config['site']['serverPath'] = "patch";
 $config['site']['useServerConfigCache'] = false;
 
 # Config Shop
