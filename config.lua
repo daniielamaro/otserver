@@ -96,8 +96,8 @@ maxMarketOffersAtATimePerPlayer = 100
 
 -- MySQL
 mysqlHost = "localhost"
-mysqlUser = "otserver"
-mysqlPass = "otserver"
+mysqlUser = "root"
+mysqlPass = ""
 mysqlDatabase = "otserver"
 mysqlPort = 3306
 mysqlSock = ""

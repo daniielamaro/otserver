@@ -25,7 +25,7 @@ services:
       - MYSQL_DATABASE=otserver
       - MYSQL_USER=otserver
       - MYSQL_PASSWORD=otserver
-      - MYSQL_RANDOM_ROOT_PASSWORD=yes
+			- MYSQL_ROOT_PASSWORD=otserver
     ports:
       - "3306:3306"
     volumes:
@@ -33,7 +33,9 @@ services:
 
   otweb:
     container_name: otwebsite
-    image: webdevops/php-nginx:alpine-php7
+    build:
+      context: ./
+      dockerfile: ./Dockerfile.web
     restart: unless-stopped
     environment:
       - WEB_DOCUMENT_ROOT=/tmp/web/
@@ -41,7 +43,6 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./data/web:/tmp/web
       - ot-volume:/opt/otserver
     depends_on:
       - otdb
