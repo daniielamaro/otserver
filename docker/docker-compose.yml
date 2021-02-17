@@ -11,8 +11,7 @@ services:
       - "7171:7171"
       - "7172:7172"
     volumes:
-      - ../:/otserver
-      - ot-volume:/opt/otserver/
+      - ot-volume:/opt/otserver
     depends_on:
       - otdb
 
@@ -43,8 +42,7 @@ services:
       - "80:80"
     volumes:
       - ./data/web:/tmp/web
-      - ../:/tmp/otserver/
-      - ot-volume:/otserver/
+      - ot-volume:/opt/otserver
     depends_on:
       - otdb
       - otserver
@@ -57,12 +55,13 @@ services:
     restart: unless-stopped
     volumes:
       - ./data/:/tmp/
-      - ot-volume:/otserver/
+      - ot-volume:/opt/otserver
     ports:
       - "8080:80"
     depends_on:
       - otdb
       - otserver
+			- otweb
 
 volumes:
   db-volume:
