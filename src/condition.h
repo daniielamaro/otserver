@@ -20,8 +20,6 @@
 #ifndef FS_CONDITION_H_F92FF8BDDD5B4EA59E2B1BB5C9C0A086
 #define FS_CONDITION_H_F92FF8BDDD5B4EA59E2B1BB5C9C0A086
 
-#include <list>  
-
 #include "fileloader.h"
 #include "enums.h"
 
@@ -57,6 +55,8 @@ enum ConditionAttr_t {
 	CONDITIONATTR_PERIODDAMAGE,
 	CONDITIONATTR_ISBUFF,
 	CONDITIONATTR_SUBID,
+	CONDITIONATTR_ISAGGRESSIVE,
+	CONDITIONATTR_DISABLEDEFENSE,
 
 	//reserved for serialization
 	CONDITIONATTR_END = 254,
@@ -72,9 +72,9 @@ class Condition
 {
 	public:
 		Condition() = default;
-		Condition(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			endTime(initTicks == -1 ? std::numeric_limits<int64_t>::max() : 0),
-			subId(initSubId), ticks(initTicks),	conditionType(initType), id(initId), isBuff(initBuff) {}
+		Condition(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			endTime(ticks == -1 ? std::numeric_limits<int64_t>::max() : 0),
+			subId(subId), ticks(ticks), conditionType(type), isBuff(buff), aggressive(aggressive), id(id) {}
 		virtual ~Condition() = default;
 
 		virtual bool startCondition(Creature* creature);
@@ -101,8 +101,11 @@ class Condition
 			return ticks;
 		}
 		void setTicks(int32_t newTicks);
+		bool isAggressive() const {
+			return aggressive;
+		}
 
-		static Condition* createCondition(ConditionId_t id, ConditionType_t type, int32_t ticks, int32_t param = 0, bool buff = false, uint32_t subId = 0);
+		static Condition* createCondition(ConditionId_t id, ConditionType_t type, int32_t ticks, int32_t param = 0, bool buff = false, uint32_t subId = 0, bool aggressive = false);
 		static Condition* createCondition(PropStream& propStream);
 
 		virtual bool setParam(ConditionParam_t param, int32_t value);
@@ -115,21 +118,24 @@ class Condition
 		bool isPersistent() const;
 
 	protected:
+		virtual bool updateCondition(const Condition* addCondition);
+
 		int64_t endTime;
 		uint32_t subId;
 		int32_t ticks;
 		ConditionType_t conditionType;
-		ConditionId_t id;
 		bool isBuff;
+		bool aggressive;
 
-		virtual bool updateCondition(const Condition* addCondition);
+	private:
+		ConditionId_t id;
 };
 
 class ConditionGeneric : public Condition
 {
 	public:
-		ConditionGeneric(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0):
-			Condition(initId, initType, initTicks, initBuff, initSubId) {}
+		ConditionGeneric(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false):
+			Condition(id, type, ticks, buff, subId, aggressive) {}
 
 		bool startCondition(Creature* creature) override;
 		bool executeCondition(Creature* creature, int32_t interval) override;
@@ -145,27 +151,28 @@ class ConditionGeneric : public Condition
 class ConditionAttributes final : public ConditionGeneric
 {
 	public:
-		ConditionAttributes(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			ConditionGeneric(initId, initType, initTicks, initBuff, initSubId) {}
+		ConditionAttributes(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			ConditionGeneric(id, type, ticks, buff, subId, aggressive) {}
 
-		bool startCondition(Creature* creature) final;
-		bool executeCondition(Creature* creature, int32_t interval) final;
-		void endCondition(Creature* creature) final;
-		void addCondition(Creature* creature, const Condition* condition) final;
+		bool startCondition(Creature* creature) override;
+		bool executeCondition(Creature* creature, int32_t interval) override;
+		void endCondition(Creature* creature) override;
+		void addCondition(Creature* creature, const Condition* condition) override;
 
-		bool setParam(ConditionParam_t param, int32_t value) final;
+		bool setParam(ConditionParam_t param, int32_t value) override;
 
-		ConditionAttributes* clone() const final {
+		ConditionAttributes* clone() const override {
 			return new ConditionAttributes(*this);
 		}
 
 		//serialization
-		void serialize(PropWriteStream& propWriteStream) final;
-		bool unserializeProp(ConditionAttr_t attr, PropStream& propStream) final;
+		void serialize(PropWriteStream& propWriteStream) override;
+		bool unserializeProp(ConditionAttr_t attr, PropStream& propStream) override;
 
 	private:
 		int32_t skills[SKILL_LAST + 1] = {};
 		int32_t skillsPercent[SKILL_LAST + 1] = {};
+		int32_t specialSkills[SPECIALSKILL_LAST + 1] = {};
 		int32_t stats[STAT_LAST + 1] = {};
 		int32_t statsPercent[STAT_LAST + 1] = {};
 		int32_t currentSkill = 0;
@@ -182,12 +189,10 @@ class ConditionAttributes final : public ConditionGeneric
 class ConditionRegeneration final : public ConditionGeneric
 {
 	public:
-		ConditionRegeneration(ConditionId_t initId, ConditionType_t initType, int32_t iniTicks, bool initBuff = false, uint32_t initSubId = 0):
-			ConditionGeneric(initId, initType, iniTicks, initBuff, initSubId) {}
+		ConditionRegeneration(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false):
+			ConditionGeneric(id, type, ticks, buff, subId, aggressive) {}
 
-		bool startCondition(Creature* creature) override;
-		void endCondition(Creature* creature) override;
-		void addCondition(Creature* creature, const Condition* addCondition) override;
+		void addCondition(Creature* creature, const Condition* condition) override;
 		bool executeCondition(Creature* creature, int32_t interval) override;
 
 		bool setParam(ConditionParam_t param, int32_t value) override;
@@ -213,10 +218,10 @@ class ConditionRegeneration final : public ConditionGeneric
 class ConditionSoul final : public ConditionGeneric
 {
 	public:
-		ConditionSoul(ConditionId_t initId, ConditionType_t initType, int32_t iniTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			ConditionGeneric(initId, initType, iniTicks, initBuff, initSubId) {}
+		ConditionSoul(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			ConditionGeneric(id, type, ticks, buff, subId, aggressive) {}
 
-		void addCondition(Creature* creature, const Condition* addCondition) override;
+		void addCondition(Creature* creature, const Condition* condition) override;
 		bool executeCondition(Creature* creature, int32_t interval) override;
 
 		bool setParam(ConditionParam_t param, int32_t value) override;
@@ -238,8 +243,8 @@ class ConditionSoul final : public ConditionGeneric
 class ConditionInvisible final : public ConditionGeneric
 {
 	public:
-		ConditionInvisible(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			ConditionGeneric(initId, initType, initTicks, initBuff, initSubId) {}
+		ConditionInvisible(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			ConditionGeneric(id, type, ticks, buff, subId, aggressive) {}
 
 		bool startCondition(Creature* creature) override;
 		void endCondition(Creature* creature) override;
@@ -253,8 +258,8 @@ class ConditionDamage final : public Condition
 {
 	public:
 		ConditionDamage() = default;
-		ConditionDamage(ConditionId_t intiId, ConditionType_t initType, bool initBuff = false, uint32_t initSubId = 0) :
-			Condition(intiId, initType, 0, initBuff, initSubId) {}
+		ConditionDamage(ConditionId_t id, ConditionType_t type, bool buff = false, uint32_t subId = 0, bool aggressive = true) :
+			Condition(id, type, 0, buff, subId, aggressive) {}
 
 		static void generateDamageList(int32_t amount, int32_t start, std::list<int32_t>& list);
 
@@ -276,6 +281,10 @@ class ConditionDamage final : public Condition
 		}
 		int32_t getTotalDamage() const;
 
+		void setInitDamage(int32_t initDamage) {
+			this->initDamage = initDamage;
+		}
+
 		//serialization
 		void serialize(PropWriteStream& propWriteStream) override;
 		bool unserializeProp(ConditionAttr_t attr, PropStream& propStream) override;
@@ -287,6 +296,7 @@ class ConditionDamage final : public Condition
 		int32_t periodDamage = 0;
 		int32_t periodDamageTick = 0;
 		int32_t tickInterval = 2000;
+		int32_t initDamage = 0;
 
 		bool forceUpdate = false;
 		bool delayed = false;
@@ -306,8 +316,8 @@ class ConditionDamage final : public Condition
 class ConditionSpeed final : public Condition
 {
 	public:
-		ConditionSpeed(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff, uint32_t initSubId, int32_t initChangeSpeed) :
-			Condition(initId, initType, initTicks, initBuff, initSubId), speedDelta(initChangeSpeed) {}
+		ConditionSpeed(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff, uint32_t subId, int32_t changeSpeed, bool aggressive = false) :
+			Condition(id, type, ticks, buff, subId, aggressive), speedDelta(changeSpeed) {}
 
 		bool startCondition(Creature* creature) override;
 		bool executeCondition(Creature* creature, int32_t interval) override;
@@ -328,8 +338,6 @@ class ConditionSpeed final : public Condition
 		bool unserializeProp(ConditionAttr_t attr, PropStream& propStream) override;
 
 	private:
-		void getFormulaValues(int32_t var, int32_t& min, int32_t& max) const;
-
 		int32_t speedDelta;
 
 		//formula variables
@@ -342,8 +350,8 @@ class ConditionSpeed final : public Condition
 class ConditionOutfit final : public Condition
 {
 	public:
-		ConditionOutfit(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			Condition(initId, initType, initTicks, initBuff, initSubId) {}
+		ConditionOutfit(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			Condition(id, type, ticks, buff, subId, aggressive) {}
 
 		bool startCondition(Creature* creature) override;
 		bool executeCondition(Creature* creature, int32_t interval) override;
@@ -355,7 +363,6 @@ class ConditionOutfit final : public Condition
 		}
 
 		void setOutfit(const Outfit_t& outfit);
-		void setLazyMonsterOutfit(const std::string& monsterName);
 
 		//serialization
 		void serialize(PropWriteStream& propWriteStream) override;
@@ -363,19 +370,18 @@ class ConditionOutfit final : public Condition
 
 	private:
 		Outfit_t outfit;
-		std::string monsterName;
 };
 
 class ConditionLight final : public Condition
 {
 	public:
-		ConditionLight(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff, uint32_t initSubId, uint8_t initLightlevel, uint8_t initLightcolor) :
-			Condition(initId, initType, initTicks, initBuff, initSubId), lightInfo(initLightlevel, initLightcolor) {}
+		ConditionLight(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff, uint32_t subId, uint8_t lightlevel, uint8_t lightcolor, bool aggressive = false) :
+			Condition(id, type, ticks, buff, subId, aggressive), lightInfo(lightlevel, lightcolor) {}
 
 		bool startCondition(Creature* creature) override;
 		bool executeCondition(Creature* creature, int32_t interval) override;
 		void endCondition(Creature* creature) override;
-		void addCondition(Creature* creature, const Condition* addCondition) override;
+		void addCondition(Creature* creature, const Condition* condition) override;
 
 		ConditionLight* clone() const override {
 			return new ConditionLight(*this);
@@ -396,8 +402,8 @@ class ConditionLight final : public Condition
 class ConditionSpellCooldown final : public ConditionGeneric
 {
 	public:
-		ConditionSpellCooldown(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			ConditionGeneric(initId, initType, initTicks, initBuff, initSubId) {}
+		ConditionSpellCooldown(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			ConditionGeneric(id, type, ticks, buff, subId, aggressive) {}
 
 		bool startCondition(Creature* creature) override;
 		void addCondition(Creature* creature, const Condition* condition) override;
@@ -410,8 +416,8 @@ class ConditionSpellCooldown final : public ConditionGeneric
 class ConditionSpellGroupCooldown final : public ConditionGeneric
 {
 	public:
-		ConditionSpellGroupCooldown(ConditionId_t initId, ConditionType_t initType, int32_t initTicks, bool initBuff = false, uint32_t initSubId = 0) :
-			ConditionGeneric(initId, initType, initTicks, initBuff, initSubId) {}
+		ConditionSpellGroupCooldown(ConditionId_t id, ConditionType_t type, int32_t ticks, bool buff = false, uint32_t subId = 0, bool aggressive = false) :
+			ConditionGeneric(id, type, ticks, buff, subId, aggressive) {}
 
 		bool startCondition(Creature* creature) override;
 		void addCondition(Creature* creature, const Condition* condition) override;

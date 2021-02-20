@@ -53,9 +53,9 @@ Npc* Npc::createNpc(const std::string& name)
 	return npc.release();
 }
 
-Npc::Npc(const std::string& initName) :
+Npc::Npc(const std::string& name) :
 	Creature(),
-	filename("data/npc/" + initName + ".xml"),
+	filename("data/npc/" + name + ".xml"),
 	npcEventHandler(nullptr),
 	masterRadius(-1),
 	loaded(false)
@@ -98,6 +98,7 @@ bool Npc::load()
 void Npc::reset()
 {
 	loaded = false;
+	isIdle = true;
 	walkTicks = 1500;
 	pushable = true;
 	floorChange = false;
@@ -164,8 +165,6 @@ bool Npc::loadFromXml()
 
 	if ((attr = npcNode.attribute("walkradius"))) {
 		masterRadius = pugi::cast<int32_t>(attr.value());
-	} else {
-		masterRadius = 2;
 	}
 
 	if ((attr = npcNode.attribute("ignoreheight"))) {
@@ -192,6 +191,11 @@ bool Npc::loadFromXml()
 			healthMax = pugi::cast<int32_t>(attr.value());
 		} else {
 			healthMax = 100;
+		}
+
+		if (health > healthMax) {
+			health = healthMax;
+			std::cout << "[Warning - Npc::loadFromXml] Health now is greater than health max in " << filename << std::endl;
 		}
 	}
 
@@ -277,20 +281,18 @@ void Npc::onRemoveCreature(Creature* creature, bool isLogout)
 		if (npcEventHandler) {
 			npcEventHandler->onCreatureDisappear(creature);
 		}
-	} else {
+	} else if (Player* player = creature->getPlayer()) {
 		if (npcEventHandler) {
 			npcEventHandler->onCreatureDisappear(creature);
 		}
 
-		if (Player* player = creature->getPlayer()) {
-			spectators.erase(player);
-			updateIdleStatus();
-		}
+		spectators.erase(player);
+		updateIdleStatus();
 	}
 }
 
 void Npc::onCreatureMove(Creature* creature, const Tile* newTile, const Position& newPos,
-						 const Tile* oldTile, const Position& oldPos, bool teleport)
+                         const Tile* oldTile, const Position& oldPos, bool teleport)
 {
 	Creature::onCreatureMove(creature, newTile, newPos, oldTile, oldPos, teleport);
 
@@ -363,17 +365,12 @@ void Npc::doSayToPlayer(Player* player, const std::string& text)
 }
 
 void Npc::onPlayerTrade(Player* player, int32_t callback, uint16_t itemId, uint8_t count,
-						uint8_t amount, bool ignore/* = false*/, bool inBackpacks/* = false*/)
+                        uint8_t amount, bool ignore/* = false*/, bool inBackpacks/* = false*/)
 {
-	if (!player) {
-		return;
-	} 
-	
-	g_dispatcher.addTask(createTask(std::bind(&Game::updatePlayerSaleItems, &g_game, player->getID())));
-	player->setScheduledSaleUpdate(true);
 	if (npcEventHandler) {
 		npcEventHandler->onPlayerTrade(player, callback, itemId, count, amount, ignore, inBackpacks);
 	}
+	player->sendSaleItemList();
 }
 
 void Npc::onPlayerEndTrade(Player* player, int32_t buyCallback, int32_t sellCallback)
@@ -401,7 +398,7 @@ bool Npc::getNextStep(Direction& dir, uint32_t& flags)
 		return true;
 	}
 
-	if (walkTicks <= 0) {
+	if (walkTicks == 0) {
 		return false;
 	}
 
@@ -448,16 +445,16 @@ bool Npc::canWalkTo(const Position& fromPos, Direction dir) const
 		return false;
 	}
 
-	Tile* toTile = g_game.map.getTile(toPos);
-	if (!toTile || toTile->queryAdd(0, *this, 1, 0) != RETURNVALUE_NOERROR) {
+	Tile* tile = g_game.map.getTile(toPos);
+	if (!tile || tile->queryAdd(0, *this, 1, 0) != RETURNVALUE_NOERROR) {
 		return false;
 	}
 
-	if (!floorChange && (toTile->hasFlag(TILESTATE_FLOORCHANGE) || toTile->getTeleportItem())) {
+	if (!floorChange && (tile->hasFlag(TILESTATE_FLOORCHANGE) || tile->getTeleportItem())) {
 		return false;
 	}
 
-	if (!ignoreHeight && toTile->hasHeight(1)) {
+	if (!ignoreHeight && tile->hasHeight(1)) {
 		return false;
 	}
 
@@ -493,10 +490,10 @@ bool Npc::getRandomStep(Direction& dir) const
 	return true;
 }
 
-void Npc::doMoveTo(const Position& target)
+void Npc::doMoveTo(const Position& pos)
 {
 	std::forward_list<Direction> listDir;
-	if (getPathTo(target, listDir, 1, 1, true, true)) {
+	if (getPathTo(pos, listDir, 1, 1, true, true)) {
 		startAutoWalk(listDir);
 	}
 }
@@ -804,24 +801,24 @@ int NpcScriptInterface::luaOpenShopWindow(lua_State* L)
 		return 1;
 	}
 
-	std::vector<ShopInfo> items;
+	std::list<ShopInfo> items;
 	lua_pushnil(L);
 	while (lua_next(L, -2) != 0) {
 		const auto tableIndex = lua_gettop(L);
 		ShopInfo item;
 
-		uint16_t itemId = static_cast<uint16_t>(getField<uint32_t>(L, tableIndex, "id"));
-		int32_t subType = getField<int32_t>(L, tableIndex, "subType");
-		if (subType == 0) {
-			subType = getField<int32_t>(L, tableIndex, "subtype");
+		item.itemId = getField<uint32_t>(L, tableIndex, "id");
+		item.subType = getField<int32_t>(L, tableIndex, "subType");
+		if (item.subType == 0) {
+			item.subType = getField<int32_t>(L, tableIndex, "subtype");
 			lua_pop(L, 1);
 		}
 
-		uint32_t buyPrice = getField<uint32_t>(L, tableIndex, "buy");
-		uint32_t sellPrice = getField<uint32_t>(L, tableIndex, "sell");
-		std::string realName = getFieldString(L, tableIndex, "name");
+		item.buyPrice = getField<uint32_t>(L, tableIndex, "buy");
+		item.sellPrice = getField<uint32_t>(L, tableIndex, "sell");
+		item.realName = getFieldString(L, tableIndex, "name");
 
-		items.emplace_back(itemId, subType, buyPrice, sellPrice, std::move(realName));
+		items.push_back(item);
 		lua_pop(L, 6);
 	}
 	lua_pop(L, 1);
@@ -1023,25 +1020,25 @@ int NpcScriptInterface::luaNpcOpenShopWindow(lua_State* L)
 		buyCallback = luaL_ref(L, LUA_REGISTRYINDEX);
 	}
 
-	std::vector<ShopInfo> items;
+	std::list<ShopInfo> items;
 
 	lua_pushnil(L);
 	while (lua_next(L, 3) != 0) {
 		const auto tableIndex = lua_gettop(L);
 		ShopInfo item;
 
-		uint16_t itemId = static_cast<uint16_t>(getField<uint32_t>(L, tableIndex, "id"));
-		int32_t subType = getField<int32_t>(L, tableIndex, "subType");
-		if (subType == 0) {
-			subType = getField<int32_t>(L, tableIndex, "subtype");
+		item.itemId = getField<uint32_t>(L, tableIndex, "id");
+		item.subType = getField<int32_t>(L, tableIndex, "subType");
+		if (item.subType == 0) {
+			item.subType = getField<int32_t>(L, tableIndex, "subtype");
 			lua_pop(L, 1);
 		}
 
-		uint32_t buyPrice = getField<uint32_t>(L, tableIndex, "buy");
-		uint32_t sellPrice = getField<uint32_t>(L, tableIndex, "sell");
-		std::string realName = getFieldString(L, tableIndex, "name");
+		item.buyPrice = getField<uint32_t>(L, tableIndex, "buy");
+		item.sellPrice = getField<uint32_t>(L, tableIndex, "sell");
+		item.realName = getFieldString(L, tableIndex, "name");
 
-		items.emplace_back(itemId, subType, buyPrice, sellPrice, std::move(realName));
+		items.push_back(item);
 		lua_pop(L, 6);
 	}
 	lua_pop(L, 1);
@@ -1095,8 +1092,8 @@ int NpcScriptInterface::luaNpcCloseShopWindow(lua_State* L)
 	return 1;
 }
 
-NpcEventsHandler::NpcEventsHandler(const std::string& file, Npc* npcEvent) :
-	npc(npcEvent), scriptInterface(npcEvent->getScriptInterface())
+NpcEventsHandler::NpcEventsHandler(const std::string& file, Npc* npc) :
+	npc(npc), scriptInterface(npc->getScriptInterface())
 {
 	loaded = scriptInterface->loadFile("data/npc/scripts/" + file, npc) == 0;
 	if (!loaded) {
@@ -1126,13 +1123,7 @@ void NpcEventsHandler::onCreatureAppear(Creature* creature)
 
 	//onCreatureAppear(creature)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onCreatureAppear"
-				<< " NPC "
-				<< npc->getName()
-				<< " creature "
-				<< creature->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onCreatureAppear] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1155,13 +1146,7 @@ void NpcEventsHandler::onCreatureDisappear(Creature* creature)
 
 	//onCreatureDisappear(creature)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onCreatureDisappear"
-				<< " NPC "
-				<< npc->getName()
-				<< " creature "
-				<< creature->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onCreatureDisappear] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1184,13 +1169,7 @@ void NpcEventsHandler::onCreatureMove(Creature* creature, const Position& oldPos
 
 	//onCreatureMove(creature, oldPos, newPos)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onCreatureMove"
-				<< " NPC "
-				<< npc->getName()
-				<< " creature "
-				<< creature->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onCreatureMove] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1215,13 +1194,7 @@ void NpcEventsHandler::onCreatureSay(Creature* creature, SpeakClasses type, cons
 
 	//onCreatureSay(creature, type, msg)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onCreatureSay"
-				<< " NPC "
-				<< npc->getName()
-				<< " creature "
-				<< creature->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onCreatureSay] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1238,8 +1211,8 @@ void NpcEventsHandler::onCreatureSay(Creature* creature, SpeakClasses type, cons
 	scriptInterface->callFunction(3);
 }
 
-void NpcEventsHandler::onPlayerTrade(Player* player, int32_t callback, uint16_t itemid,
-							  uint8_t count, uint8_t amount, bool ignore, bool inBackpacks)
+void NpcEventsHandler::onPlayerTrade(Player* player, int32_t callback, uint16_t itemId,
+                              uint8_t count, uint8_t amount, bool ignore, bool inBackpacks)
 {
 	if (callback == -1) {
 		return;
@@ -1247,13 +1220,7 @@ void NpcEventsHandler::onPlayerTrade(Player* player, int32_t callback, uint16_t 
 
 	//onBuy(player, itemid, count, amount, ignore, inbackpacks)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onPlayerTrade"
-				<< " NPC "
-				<< npc->getName()
-				<< " player "
-				<< player->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onPlayerTrade] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1265,7 +1232,7 @@ void NpcEventsHandler::onPlayerTrade(Player* player, int32_t callback, uint16_t 
 	LuaScriptInterface::pushCallback(L, callback);
 	LuaScriptInterface::pushUserdata<Player>(L, player);
 	LuaScriptInterface::setMetatable(L, -1, "Player");
-	lua_pushnumber(L, itemid);
+	lua_pushnumber(L, itemId);
 	lua_pushnumber(L, count);
 	lua_pushnumber(L, amount);
 	LuaScriptInterface::pushBoolean(L, ignore);
@@ -1281,13 +1248,7 @@ void NpcEventsHandler::onPlayerCloseChannel(Player* player)
 
 	//onPlayerCloseChannel(player)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onPlayerCloseChannel"
-				<< " NPC "
-				<< npc->getName()
-				<< " player "
-				<< player->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onPlayerCloseChannel] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1310,13 +1271,7 @@ void NpcEventsHandler::onPlayerEndTrade(Player* player)
 
 	//onPlayerEndTrade(player)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onPlayerEndTrade"
-				<< " NPC "
-				<< npc->getName()
-				<< " player "
-				<< player->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onPlayerEndTrade] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1339,11 +1294,7 @@ void NpcEventsHandler::onThink()
 
 	//onThink()
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - NpcScript::onThink"
-				<< " NPC "
-				<< npc->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - NpcScript::onThink] Call stack overflow" << std::endl;
 		return;
 	}
 

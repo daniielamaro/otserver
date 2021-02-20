@@ -46,7 +46,7 @@ enum slots_t : uint8_t {
 	CONST_SLOT_STORE_INBOX = 11,
 
 	CONST_SLOT_FIRST = CONST_SLOT_HEAD,
-	CONST_SLOT_LAST = CONST_SLOT_STORE_INBOX,
+	CONST_SLOT_LAST = CONST_SLOT_AMMO,
 };
 
 struct FindPathParams {
@@ -75,7 +75,7 @@ static constexpr int32_t EVENT_CHECK_CREATURE_INTERVAL = (EVENT_CREATURE_THINK_I
 class FrozenPathingConditionCall
 {
 	public:
-		explicit FrozenPathingConditionCall(Position newTargetPos) : targetPos(std::move(newTargetPos)) {}
+		explicit FrozenPathingConditionCall(Position targetPos) : targetPos(std::move(targetPos)) {}
 
 		bool operator()(const Position& startPos, const Position& testPos,
 		                const FindPathParams& fpp, int32_t& bestMatchDist) const;
@@ -173,13 +173,6 @@ class Creature : virtual public Thing
 			hiddenHealth = b;
 		}
 
-		bool isMoveLocked() const {
-			return moveLocked;
-		}
-		void setMoveLocked(bool locked) {
-			moveLocked = locked;
-		}
-
 		int32_t getThrowRange() const override final {
 			return 1;
 		}
@@ -234,12 +227,6 @@ class Creature : virtual public Thing
 		virtual int32_t getMaxHealth() const {
 			return healthMax;
 		}
-		uint32_t getMana() const {
-			return mana;
-		}
-		virtual uint32_t getMaxMana() const {
-			return mana;
-		}
 
 		const Outfit_t getCurrentOutfit() const {
 			return currentOutfit;
@@ -282,7 +269,7 @@ class Creature : virtual public Thing
 		}
 		virtual bool setAttackedCreature(Creature* creature);
 		virtual BlockType_t blockHit(Creature* attacker, CombatType_t combatType, int32_t& damage,
-		                             bool checkDefense = false, bool checkArmor = false, bool field = false);
+		                             bool checkDefense = false, bool checkArmor = false, bool field = false, bool ignoreResistances = false);
 
 		bool setMaster(Creature* newMaster);
 
@@ -295,12 +282,6 @@ class Creature : virtual public Thing
 
 		bool isSummon() const {
 			return master != nullptr;
-		}
-		/**
-		 * hasBeenSummoned doesn't guarantee master still exists
-		 */ 
-		bool hasBeenSummoned() const {
-			return summoned;
 		}
 		Creature* getMaster() const {
 			return master;
@@ -354,11 +335,9 @@ class Creature : virtual public Thing
 		}
 
 		virtual void changeHealth(int32_t healthChange, bool sendHealthChange = true);
-		virtual void changeMana(int32_t manaChange);
 
-		void gainHealth(Creature* attacker, int32_t healthGain);
+		void gainHealth(Creature* healer, int32_t healthGain);
 		virtual void drainHealth(Creature* attacker, int32_t damage);
-		virtual void drainMana(Creature* attacker, int32_t manaLoss);
 
 		virtual bool challengeCreature(Creature*) {
 			return false;
@@ -375,11 +354,10 @@ class Creature : virtual public Thing
 		virtual void onEndCondition(ConditionType_t type);
 		void onTickCondition(ConditionType_t type, bool& bRemove);
 		virtual void onCombatRemoveCondition(Condition* condition);
-		virtual void onAttackedCreature(Creature*) {}
+		virtual void onAttackedCreature(Creature*, bool = true) {}
 		virtual void onAttacked();
 		virtual void onAttackedCreatureDrainHealth(Creature* target, int32_t points);
 		virtual void onTargetCreatureGainHealth(Creature*, int32_t) {}
-		void onAttackedCreatureKilled(Creature* target);
 		virtual bool onKilledCreature(Creature* target, bool lastHit = true);
 		virtual void onGainExperience(uint64_t gainExp, Creature* target);
 		virtual void onAttackedCreatureBlockHit(BlockType_t) {}
@@ -394,7 +372,7 @@ class Creature : virtual public Thing
 
 		virtual void onThink(uint32_t interval);
 		void onAttacking(uint32_t interval);
-		virtual void onCreatureWalk();
+		virtual void onWalk();
 		virtual bool getNextStep(Direction& dir, uint32_t& flags);
 
 		void onAddTileItem(const Tile* tile, const Position& pos);
@@ -422,14 +400,21 @@ class Creature : virtual public Thing
 		size_t getSummonCount() const {
 			return summons.size();
 		}
-		void setDropLoot(bool newLootDrop) {
-			this->lootDrop = newLootDrop;
+		void setDropLoot(bool lootDrop) {
+			this->lootDrop = lootDrop;
 		}
-		void setSkillLoss(bool newSkillLoss) {
-			this->skillLoss = newSkillLoss;
+		void setSkillLoss(bool skillLoss) {
+			this->skillLoss = skillLoss;
 		}
 		void setUseDefense(bool useDefense) {
 			canUseDefense = useDefense;
+		}
+		void setMovementBlocked(bool state) {
+			movementBlocked = state;
+			cancelNextWalk = true;
+		}
+		bool isMovementBlocked() const {
+			return movementBlocked;
 		}
 
 		//creature script events
@@ -511,16 +496,6 @@ class Creature : virtual public Thing
 		Creature* master = nullptr;
 		Creature* followCreature = nullptr;
 
-		/**
-		 * We need to persist if this creature is summon or not because when we
-		 * increment the bestiary count, the master might be gone before we can
-		 * check if this summon has a master and mistakenly count it kill.
-		 * 
-		 * @see BestiaryOnKill
-		 * @see Monster::death()
-		 */
-		bool summoned = false;
-
 		uint64_t lastStep = 0;
 		uint32_t referenceCounter = 0;
 		uint32_t id = 0;
@@ -532,7 +507,6 @@ class Creature : virtual public Thing
 		uint32_t blockTicks = 0;
 		uint32_t lastStepCost = 1;
 		uint32_t baseSpeed = 220;
-		uint32_t mana = 0;
 		int32_t varSpeed = 0;
 		int32_t health = 1000;
 		int32_t healthMax = 1000;
@@ -559,7 +533,7 @@ class Creature : virtual public Thing
 		bool forceUpdateFollowPath = false;
 		bool hiddenHealth = false;
 		bool canUseDefense = true;
-		bool moveLocked = false;
+		bool movementBlocked = false;
 
 		//creature script events
 		bool hasEventRegistered(CreatureEventType_t event) const {

@@ -196,18 +196,6 @@ bool Spells::registerRuneLuaEvent(RuneSpell* event)
 	return false;
 }
 
-std::list<uint16_t> Spells::getSpellsByVocation(uint16_t vocationId)
-{
-	std::list<uint16_t> spellsList;
-	for (const auto& it : instants) {
-		VocSpellMap map = it.second.getVocMap();
-		if (map.find(vocationId)->second) {
-			spellsList.push_back(it.second.getId());
-		}
-	}
-	return spellsList;
-}
-
 Spell* Spells::getSpellByName(const std::string& name)
 {
 	Spell* spell = getRuneSpellByName(name);
@@ -301,11 +289,11 @@ Position Spells::getCasterPosition(Creature* creature, Direction dir)
 	return getNextPosition(dir, creature->getPosition());
 }
 
-CombatSpell::CombatSpell(Combat* initCombat, bool initNeedTarget, bool initNeedDirection) :
+CombatSpell::CombatSpell(Combat* combat, bool needTarget, bool needDirection) :
 	Event(&g_spells->getScriptInterface()),
-	combat(initCombat),
-	needDirection(initNeedDirection),
-	needTarget(initNeedTarget)
+	combat(combat),
+	needDirection(needDirection),
+	needTarget(needTarget)
 {}
 
 CombatSpell::~CombatSpell()
@@ -385,11 +373,7 @@ bool CombatSpell::executeCastSpell(Creature* creature, const LuaVariant& var)
 {
 	//onCastSpell(creature, var)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - CombatSpell::executeCastSpell"
-				<< " Creature "
-				<< creature->getName()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - CombatSpell::executeCastSpell] Call stack overflow" << std::endl;
 		return false;
 	}
 
@@ -528,10 +512,6 @@ bool Spell::configureSpell(const pugi::xml_node& node)
 		cooldown = pugi::cast<uint32_t>(attr.value());
 	}
 
-	if ((attr = node.attribute("setPzLocked"))) {
-		pzLocked = attr.as_bool();
-	}
-
 	if ((attr = node.attribute("premium")) || (attr = node.attribute("prem"))) {
 		premium = attr.as_bool();
 	}
@@ -575,6 +555,10 @@ bool Spell::configureSpell(const pugi::xml_node& node)
 		}
 	}
 
+	if ((attr = node.attribute("pzlock"))) {
+		pzLock = booleanString(attr.as_string());
+	}
+
 	if ((attr = node.attribute("aggressive"))) {
 		aggressive = booleanString(attr.as_string());
 	}
@@ -613,18 +597,18 @@ bool Spell::playerSpellCheck(Player* player) const
 		return false;
 	}
 
-	if (aggressive && (range < 1 || (range > 0 && !player->getAttackedCreature())) && player->getSkull() == SKULL_BLACK) {
+	if ((aggressive || pzLock) && (range < 1 || (range > 0 && !player->getAttackedCreature())) && player->getSkull() == SKULL_BLACK) {
 		player->sendCancelMessage(RETURNVALUE_NOTPOSSIBLE);
 		return false;
 	}
 
-	if (aggressive && player->hasCondition(CONDITION_PACIFIED)) {
+	if ((aggressive || pzLock) && player->hasCondition(CONDITION_PACIFIED)) {
 		player->sendCancelMessage(RETURNVALUE_YOUAREEXHAUSTED);
 		g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
 		return false;
 	}
 
-	if (aggressive && !player->hasFlag(PlayerFlag_IgnoreProtectionZone) && player->getZone() == ZONE_PROTECTION) {
+	if ((aggressive || pzLock) && !player->hasFlag(PlayerFlag_IgnoreProtectionZone) && player->getZone() == ZONE_PROTECTION) {
 		player->sendCancelMessage(RETURNVALUE_ACTIONNOTPERMITTEDINPROTECTIONZONE);
 		return false;
 	}
@@ -1109,13 +1093,7 @@ bool InstantSpell::executeCastSpell(Creature* creature, const LuaVariant& var)
 {
 	//onCastSpell(creature, var)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - InstantSpell::executeCastSpell"
-				<< " Creature "
-				<< creature->getName()
-				<< " words "
-				<< getWords()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - InstantSpell::executeCastSpell] Call stack overflow" << std::endl;
 		return false;
 	}
 
@@ -1257,16 +1235,16 @@ bool RuneSpell::executeUse(Player* player, Item* item, const Position&, Thing* t
 	}
 
 	postCastSpell(player);
+
+	target = g_game.getCreatureByID(var.number);
+	if (getPzLock() && target) {
+		player->onAttackedCreature(target->getCreature());
+	}
+
 	if (hasCharges && item && g_config.getBoolean(ConfigManager::REMOVE_RUNE_CHARGES)) {
 		int32_t newCount = std::max<int32_t>(0, item->getItemCount() - 1);
 		g_game.transformItem(item, item->getID(), newCount);
-		player->updateSupplyTracker(item);
 	}
-
-	if (getPzOnUse() && g_game.getWorldType() == WORLD_TYPE_PVP) {
-		player->addInFightTicks(true);
-	}
-
 	return true;
 }
 
@@ -1301,13 +1279,7 @@ bool RuneSpell::executeCastSpell(Creature* creature, const LuaVariant& var, bool
 {
 	//onCastSpell(creature, var, isHotkey)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - RuneSpell::executeCastSpell"
-				<< " Creature "
-				<< creature->getName() 
-				<< " runeId "
-				<< getRuneItemId()
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - RuneSpell::executeCastSpell] Call stack overflow" << std::endl;
 		return false;
 	}
 

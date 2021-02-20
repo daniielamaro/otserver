@@ -2,64 +2,37 @@
 -- NOTE: valid values for worldType are: "pvp", "no-pvp" and "pvp-enforced"
 worldType = "pvp"
 hotkeyAimbotEnabled = true
-protectionLevel = 7
-pzLocked = 60 * 1000
+protectionLevel = 1
+killsToRedSkull = 3
+killsToBlackSkull = 6
+pzLocked = 60000
 removeChargesFromRunes = true
 removeChargesFromPotions = true
 removeWeaponAmmunition = true
 removeWeaponCharges = true
-timeToDecreaseFrags = 1 * 24 * 60 * 60
-whiteSkullTime = 15 * 60 * 1000
-stairJumpExhaustion = 2 * 1000
+timeToDecreaseFrags = 24 * 60 * 60
+whiteSkullTime = 15 * 60
+stairJumpExhaustion = 2000
 experienceByKillingPlayers = false
 expFromPlayersLevelRange = 75
-dayKillsToRedSkull = 3
-weekKillsToRedSkull = 5
-monthKillsToRedSkull = 10
-redSkullDuration = 1
-blackSkullDuration = 3
-orangeSkullDuration = 7
-
-onlyInvitedCanMoveHouseItems = true
-cleanProtectionZones = false
 
 -- Connection Config
 -- NOTE: maxPlayers set to 0 means no limit
--- NOTE: MaxPacketsPerSeconds if you change you will be subject to bugs by WPE, keep the default value of 25
+-- NOTE: allowWalkthrough is only applicable to players
 ip = "127.0.0.1"
 bindOnlyGlobalAddress = false
 loginProtocolPort = 7171
 gameProtocolPort = 7172
 statusProtocolPort = 7171
 maxPlayers = 0
-motd = "Bem vindo ao OTServBR-Global!"
+motd = "Welcome to The Forgotten Server!"
 onePlayerOnlinePerAccount = true
 allowClones = false
-serverName = "OTServBR-Global"
-statusTimeout = 5 * 1000
+allowWalkthrough = true
+serverName = "Forgotten"
+statusTimeout = 5000
 replaceKickOnLogin = true
 maxPacketsPerSecond = 25
-maxItem = 2000
-maxContainer = 100
-
---- Version
-clientVersion = 1260
-clientVersionStr = "A versao desse server eh 12.60!"
-
--- Depot Limit
-freeDepotLimit = 2000
-premiumDepotLimit = 10000
-depotBoxes = 18
-
--- GameStore
-gamestoreByModules = true
-
--- NOTE: Access only for Premium Account
-onlyPremiumAccount = false
-
--- Customs
-weatherRain = false
-thunderEffect = false
 
 -- Deaths
 -- NOTE: Leave deathLosePercent as -1 if you want to use the default
@@ -69,24 +42,22 @@ deathLosePercent = -1
 
 -- Houses
 -- NOTE: set housePriceEachSQM to -1 to disable the ingame buy house functionality
--- Periods: daily/weekly/monthly/yearly/never
+-- NOTE: valid values for houseRentPeriod are: "daily", "weekly", "monthly", "yearly"
+-- use any other value to disable the rent system
 housePriceEachSQM = 1000
 houseRentPeriod = "never"
 houseOwnedByAccount = false
+houseDoorShowPrice = true
+onlyInvitedCanMoveHouseItems = true
 
 -- Item Usage
 timeBetweenActions = 200
 timeBetweenExActions = 1000
 
--- Push Delay
-pushDelay = 1000
-pushDistanceDelay = 1500
-
 -- Map
 -- NOTE: set mapName WITHOUT .otbm at the end
--- NOTE: unzip the map world.rar
-mapName = "otservbr"
-mapAuthor = "OTServBR"
+mapName = "forgotten"
+mapAuthor = "Komic"
 
 -- Market
 marketOfferDuration = 30 * 24 * 60 * 60
@@ -95,25 +66,39 @@ checkExpiredMarketOffersEachMinutes = 60
 maxMarketOffersAtATimePerPlayer = 100
 
 -- MySQL
-mysqlHost = "localhost"
-mysqlUser = "root"
-mysqlPass = ""
+mysqlHost = "otdb"
+mysqlUser = "otserver"
+mysqlPass = "otserver"
 mysqlDatabase = "otserver"
 mysqlPort = 3306
 mysqlSock = ""
 
 -- Misc.
+-- NOTE: classicAttackSpeed set to true makes players constantly attack at regular
+-- intervals regardless of other actions such as item (potion) use. This setting
+-- may cause high CPU usage with many players and potentially affect performance!
+-- NOTE: forceMonsterTypesOnLoad loads all monster types on startup to validate them.
+-- You can disable it to save some memory if you don't see any errors at startup.
 allowChangeOutfit = true
 freePremium = false
 kickIdlePlayerAfterMinutes = 15
 maxMessageBuffer = 4
 emoteSpells = false
 classicEquipmentSlots = false
-allowWalkthrough = true
-coinPacketSize = 25
-coinImagesURL = "http://127.0.0.1/images/store/"
 classicAttackSpeed = false
-showScriptsLogInConsole = false
+showScriptsLogInConsole = true
+showOnlineStatusInCharlist = false
+yellMinimumLevel = 2
+yellAlwaysAllowPremium = false
+forceMonsterTypesOnLoad = true
+cleanProtectionZones = false
+luaItemDesc = false
+
+-- World Light
+-- NOTE: if defaultWorldLight is set to true the world light algorithm will
+-- be handled in the sources. set it to false to avoid conflicts if you wish
+-- to make use of the function setWorldLight(level, color)
+defaultWorldLight = true
 
 -- Server Save
 -- NOTE: serverSaveNotifyDuration in minutes
@@ -123,23 +108,34 @@ serverSaveCleanMap = false
 serverSaveClose = false
 serverSaveShutdown = true
 
+-- Experience stages
+-- NOTE: to use a flat experience multiplier, set experienceStages to nil
+-- minlevel and multiplier are MANDATORY
+-- maxlevel is OPTIONAL, but is considered infinite by default
+-- to disable stages, create a stage with minlevel 1 and no maxlevel
+experienceStages = {
+	{ minlevel = 1, maxlevel = 8, multiplier = 7 },
+	{ minlevel = 9, maxlevel = 20, multiplier = 6 },
+	{ minlevel = 21, maxlevel = 50, multiplier = 5 },
+	{ minlevel = 51, maxlevel = 100, multiplier = 4 },
+	{ minlevel = 101, multiplier = 3 }
+}
+
 -- Rates
--- NOTE: rateExp, rateSkill and rateMagic is used as a fallback only
--- To configure rates see file data/stages.lua
-rateExp = 1
-rateSkill = 50
-rateLoot = 3
-rateMagic = 25
+-- NOTE: rateExp is not used if you have enabled stages above
+rateExp = 5
+rateSkill = 3
+rateLoot = 2
+rateMagic = 3
 rateSpawn = 1
 
--- Monster rates
-rateMonsterHealth = 1.0
-rateMonsterAttack = 1.0
-rateMonsterDefense = 1.0
-
--- Monsters
+-- Monster Despawn Config
+-- despawnRange is the amount of floors a monster can be from its spawn position
+-- despawnRadius is how many tiles away it can be from its spawn position
+-- removeOnDespawn will remove the monster if true or teleport it back to its spawn position if false
 deSpawnRange = 2
 deSpawnRadius = 50
+removeOnDespawn = true
 
 -- Stamina
 staminaSystem = true
@@ -152,10 +148,10 @@ convertUnsafeScripts = true
 -- NOTE: defaultPriority only works on Windows and sets process
 -- priority, valid values are: "normal", "above-normal", "high"
 defaultPriority = "high"
-startupDatabaseOptimization = true
+startupDatabaseOptimization = false
 
--- Status server information
-ownerName = "OTServBR-Global"
+-- Status Server Information
+ownerName = ""
 ownerEmail = ""
-url = "https://github.com/opentibiabr/otservbr-global"
-location = "South America"
+url = "https://otland.net/"
+location = "Sweden"

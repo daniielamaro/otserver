@@ -28,11 +28,19 @@ extern Game g_game;
 void Guild::addMember(Player* player)
 {
 	membersOnline.push_back(player);
+	for (Player* member : membersOnline) {
+		g_game.updatePlayerHelpers(*member);
+	}
 }
 
 void Guild::removeMember(Player* player)
 {
 	membersOnline.remove(player);
+	for (Player* member : membersOnline) {
+		g_game.updatePlayerHelpers(*member);
+	}
+	g_game.updatePlayerHelpers(*player);
+
 	if (membersOnline.empty()) {
 		g_game.removeGuild(id);
 		delete this;
@@ -49,10 +57,10 @@ GuildRank_ptr Guild::getRankById(uint32_t rankId)
 	return nullptr;
 }
 
-GuildRank_ptr Guild::getRankByName(const std::string& guildName) const
+GuildRank_ptr Guild::getRankByName(const std::string& name) const
 {
 	for (auto rank : ranks) {
-		if (rank->name == guildName) {
+		if (rank->name == name) {
 			return rank;
 		}
 	}
@@ -71,5 +79,5 @@ GuildRank_ptr Guild::getRankByLevel(uint8_t level) const
 
 void Guild::addRank(uint32_t rankId, const std::string& rankName, uint8_t level)
 {
-	ranks.emplace_back(std::make_shared<GuildRank>(rankId,rankName,level));
+	ranks.emplace_back(std::make_shared<GuildRank>(rankId, rankName, level));
 }

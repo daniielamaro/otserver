@@ -20,8 +20,6 @@
 #ifndef FS_IOMAP_H_8085D4B1037A44288494A52FDBB775E4
 #define FS_IOMAP_H_8085D4B1037A44288494A52FDBB775E4
 
-#include <utility>
-
 #include "item.h"
 #include "map.h"
 #include "house.h"
@@ -109,7 +107,7 @@ class IOMap
 	static Tile* createTile(Item*& ground, Item* item, uint16_t x, uint16_t y, uint8_t z);
 
 	public:
-		bool loadMap(Map* map, const std::string& identifier);
+		bool loadMap(Map* map, const std::string& fileName);
 
 		/* Load the spawns
 		 * \param map pointer to the Map class
@@ -146,7 +144,7 @@ class IOMap
 		}
 
 		void setLastErrorString(std::string error) {
-			errorString = std::move(error);
+			errorString = error;
 		}
 
 	private:

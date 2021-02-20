@@ -20,11 +20,10 @@
 #ifndef FS_TILE_H_96C7EE7CF8CD48E59D5D554A181F0C56
 #define FS_TILE_H_96C7EE7CF8CD48E59D5D554A181F0C56
 
-#include <unordered_set>
-
 #include "cylinder.h"
 #include "item.h"
 #include "tools.h"
+#include "spectators.h"
 
 class Creature;
 class Teleport;
@@ -36,7 +35,6 @@ class BedItem;
 
 using CreatureVector = std::vector<Creature*>;
 using ItemVector = std::vector<Item*>;
-using SpectatorHashSet = std::unordered_set<Creature*>;
 
 enum tileflags_t : uint32_t {
 	TILESTATE_NONE = 0,
@@ -95,7 +93,7 @@ class TileItemVector : private ItemVector
 		using ItemVector::const_iterator;
 		using ItemVector::reverse_iterator;
 		using ItemVector::const_reverse_iterator;
-    using ItemVector::empty;
+		using ItemVector::empty;
 
 		iterator getBeginDownItem() {
 			return begin();
@@ -140,15 +138,12 @@ class TileItemVector : private ItemVector
 			}
 			return *getBeginDownItem();
 		}
-		void increaseDownItemCount() {
-			downItemCount += 1;
-		}
-		void decreaseDownItemCount() {
-			downItemCount -= 1;
+		void addDownItemCount(int32_t increment) {
+			downItemCount += increment;
 		}
 
 	private:
-		uint32_t downItemCount = 0;
+		uint16_t downItemCount = 0;
 };
 
 class Tile : public Cylinder
@@ -238,7 +233,6 @@ class Tile : public Cylinder
 		std::string getDescription(int32_t lookDistance) const override final;
 
 		int32_t getClientIndexOfCreature(const Player* player, const Creature* creature) const;
-		int32_t getStackposOfCreature(const Player* player, const Creature* creature) const;
 		int32_t getStackposOfItem(const Player* player, const Item* item) const;
 
 		//cylinder implementations
@@ -246,7 +240,7 @@ class Tile : public Cylinder
 				uint32_t flags, Creature* actor = nullptr) const override;
 		ReturnValue queryMaxCount(int32_t index, const Thing& thing, uint32_t count,
 				uint32_t& maxQueryCount, uint32_t flags) const override final;
-		ReturnValue queryRemove(const Thing& thing, uint32_t count, uint32_t tileFlags, Creature* actor = nullptr) const override;
+		ReturnValue queryRemove(const Thing& thing, uint32_t count, uint32_t flags, Creature* actor = nullptr) const override;
 		Tile* queryDestination(int32_t& index, const Thing& thing, Item** destItem, uint32_t& flags) override;
 
 		void addThing(Thing* thing) override final;
@@ -268,8 +262,8 @@ class Tile : public Cylinder
 		void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER) override final;
 		void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, cylinderlink_t link = LINK_OWNER) override final;
 
-		void internalAddThing(Thing* thing) override;
-		void virtual internalAddThing(uint32_t index, Thing* thing) override;
+		void internalAddThing(Thing* thing) override final;
+		void internalAddThing(uint32_t index, Thing* thing) override;
 
 		const Position& getPosition() const override final {
 			return tilePos;
@@ -280,7 +274,6 @@ class Tile : public Cylinder
 		}
 
 		Item* getUseItem(int32_t index) const;
-		Item* getDoorItem() const;
 
 		Item* getGround() const {
 			return ground;
@@ -292,13 +285,12 @@ class Tile : public Cylinder
 	private:
 		void onAddTileItem(Item* item);
 		void onUpdateTileItem(Item* oldItem, const ItemType& oldType, Item* newItem, const ItemType& newType);
-		void onRemoveTileItem(const SpectatorHashSet& spectators, const std::vector<int32_t>& oldStackPosVector, Item* item);
-		void onUpdateTile(const SpectatorHashSet& spectators);
+		void onRemoveTileItem(const SpectatorVec& spectators, const std::vector<int32_t>& oldStackPosVector, Item* item);
+		void onUpdateTile(const SpectatorVec& spectators);
 
 		void setTileFlags(const Item* item);
 		void resetTileFlags(const Item* item);
 
-	protected:
 		Item* ground = nullptr;
 		Position tilePos;
 		uint32_t flags = 0;

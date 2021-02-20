@@ -1,5 +1,0 @@
-FROM webdevops/php-nginx:alpine-php7
-
-WORKDIR /tmp/web
-COPY data/web/ ./
-RUN chmod 777 -R /tmp/web

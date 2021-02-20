@@ -1,26 +1,5 @@
 function onUpdateDatabase()
-    print("> Updating database to version 2 (hireling)")
-
-    db.query([[
-		CREATE TABLE IF NOT EXISTS `player_hirelings` (
-            `id` INT NOT NULL PRIMARY KEY auto_increment,
-            `player_id` INT NOT NULL,
-            `name` varchar(255),
-            `active` tinyint unsigned NOT NULL DEFAULT '0',
-            `sex` tinyint unsigned NOT NULL DEFAULT '0',
-            `posx` int(11) NOT NULL DEFAULT '0',
-            `posy` int(11) NOT NULL DEFAULT '0',
-            `posz` int(11) NOT NULL DEFAULT '0',
-            `lookbody` int(11) NOT NULL DEFAULT '0',
-            `lookfeet` int(11) NOT NULL DEFAULT '0',
-            `lookhead` int(11) NOT NULL DEFAULT '0',
-            `looklegs` int(11) NOT NULL DEFAULT '0',
-            `looktype` int(11) NOT NULL DEFAULT '136',
-
-            FOREIGN KEY(`player_id`) REFERENCES `players`(`id`)
-                ON DELETE CASCADE
-		)
-	]])
-
-    return true
+	print("> Updating database to version 2 (market offers)")
+	db.query("CREATE TABLE `market_offers` (`id` INT UNSIGNED NOT NULL AUTO_INCREMENT, `player_id` INT NOT NULL, `sale` TINYINT NOT NULL DEFAULT 0, `itemtype` INT UNSIGNED NOT NULL, `amount` SMALLINT UNSIGNED NOT NULL, `created` BIGINT UNSIGNED NOT NULL, `anonymous` TINYINT(1) NOT NULL DEFAULT 0, `price` INT UNSIGNED NOT NULL DEFAULT 0, PRIMARY KEY (`id`), KEY(`sale`, `itemtype`), KEY(`created`), FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON DELETE CASCADE) ENGINE = InnoDB")
+	return true
 end

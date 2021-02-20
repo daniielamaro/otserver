@@ -28,20 +28,16 @@
 
 extern Game g_game;
 
-bool Map::loadMap(const std::string& identifier, bool loadHouses, bool loadSpawns)
+bool Map::loadMap(const std::string& identifier, bool loadHouses)
 {
-	int64_t start = OTSYS_TIME();
 	IOMap loader;
 	if (!loader.loadMap(this, identifier)) {
 		std::cout << "[Fatal - Map::loadMap] " << loader.getLastErrorString() << std::endl;
 		return false;
 	}
 
-	if (loadSpawns) {
-		if (!IOMap::loadSpawns(this)) {
-			std::cout << "[Warning - Map::loadMap] Failed to load spawn data." << std::endl;
-		}
-		std::cout << "> Loaded spawns in: " << (OTSYS_TIME() - start) / (1000.) << " seconds" << std::endl;
+	if (!IOMap::loadSpawns(this)) {
+		std::cout << "[Warning - Map::loadMap] Failed to load spawn data." << std::endl;
 	}
 
 	if (loadHouses) {
@@ -158,24 +154,58 @@ void Map::setTile(uint16_t x, uint16_t y, uint8_t z, Tile* newTile)
 	}
 }
 
-bool Map::placeCreature(const Position& centerPos, Creature* creature, bool extendedPos/* = false*/, bool forceLogin/* = false*/)
+void Map::removeTile(uint16_t x, uint16_t y, uint8_t z)
 {
-	Monster* monster = creature->getMonster();
-	if (monster) {
-		monster->ignoreFieldDamage = true;
+	if (z >= MAP_MAX_LAYERS) {
+		return;
 	}
 
+	const QTreeLeafNode* leaf = QTreeNode::getLeafStatic<const QTreeLeafNode*, const QTreeNode*>(&root, x, y);
+	if (!leaf) {
+		return;
+	}
+
+	const Floor* floor = leaf->getFloor(z);
+	if (!floor) {
+		return;
+	}
+
+	Tile* tile = floor->tiles[x & FLOOR_MASK][y & FLOOR_MASK];
+	if (tile) {
+		if (const CreatureVector* creatures = tile->getCreatures()) {
+			for (int32_t i = creatures->size(); --i >= 0;) {
+				if (Player* player = (*creatures)[i]->getPlayer()) {
+					g_game.internalTeleport(player, player->getTown()->getTemplePosition(), false, FLAG_NOLIMIT);
+				} else {
+					g_game.removeCreature((*creatures)[i]);
+				}
+			}
+		}
+
+		if (TileItemVector* items = tile->getItemList()) {
+			for (auto it = items->begin(), end = items->end(); it != end; ++it) {
+				g_game.internalRemoveItem(*it);
+			}
+		}
+
+		Item* ground = tile->getGround();
+		if (ground) {
+			g_game.internalRemoveItem(ground);
+			tile->setGround(nullptr);
+		}
+	}
+}
+
+bool Map::placeCreature(const Position& centerPos, Creature* creature, bool extendedPos/* = false*/, bool forceLogin/* = false*/)
+{
 	bool foundTile;
 	bool placeInPZ;
 
 	Tile* tile = getTile(centerPos.x, centerPos.y, centerPos.z);
 	if (tile) {
 		placeInPZ = tile->hasFlag(TILESTATE_PROTECTIONZONE);
-		ReturnValue ret = tile->queryAdd(0, *creature, 1, FLAG_IGNOREBLOCKITEM | FLAG_IGNOREFIELDDAMAGE);
+		ReturnValue ret = tile->queryAdd(0, *creature, 1, FLAG_IGNOREBLOCKITEM);
 		foundTile = forceLogin || ret == RETURNVALUE_NOERROR || ret == RETURNVALUE_PLAYERISNOTINVITED;
-    if (monster) {
-			monster->ignoreFieldDamage = false;
-		}
 	} else {
 		placeInPZ = false;
 		foundTile = false;
@@ -183,8 +213,8 @@ bool Map::placeCreature(const Position& centerPos, Creature* creature, bool exte
 
 	if (!foundTile) {
 		static std::vector<std::pair<int32_t, int32_t>> extendedRelList {
-							   {0, -2},
-					 {-1, -1}, {0, -1}, {1, -1},
+			                   {0, -2},
+			         {-1, -1}, {0, -1}, {1, -1},
 			{-2, 0}, {-1,  0},          {1,  0}, {2, 0},
 			         {-1,  1}, {0,  1}, {1,  1},
 			                   {0,  2}
@@ -213,11 +243,7 @@ bool Map::placeCreature(const Position& centerPos, Creature* creature, bool exte
 				continue;
 			}
 
-			if (monster) {
-				monster->ignoreFieldDamage = true;
-			}
-
-			if (tile->queryAdd(0, *creature, 1, FLAG_IGNOREBLOCKITEM | FLAG_IGNOREFIELDDAMAGE) == RETURNVALUE_NOERROR) {
+			if (tile->queryAdd(0, *creature, 1, 0) == RETURNVALUE_NOERROR) {
 				if (!extendedPos || isSightClear(centerPos, tryPos, false)) {
 					foundTile = true;
 					break;
@@ -227,10 +253,6 @@ bool Map::placeCreature(const Position& centerPos, Creature* creature, bool exte
 
 		if (!foundTile) {
 			return false;
-		} else {
-			if (monster) {
-				monster->ignoreFieldDamage = false;
-			}
 		}
 	}
 
@@ -255,9 +277,10 @@ void Map::moveCreature(Creature& creature, Tile& newTile, bool forceTeleport/* =
 
 	bool teleport = forceTeleport || !newTile.getGround() || !Position::areInRange<1, 1, 0>(oldPos, newPos);
 
-	SpectatorHashSet spectators;
+	SpectatorVec spectators, newPosSpectators;
 	getSpectators(spectators, oldPos, true);
-	getSpectators(spectators, newPos, true);
+	getSpectators(newPosSpectators, newPos, true);
+	spectators.addSpectators(newPosSpectators);
 
 	std::vector<int32_t> oldStackPosVector;
 	for (Creature* spectator : spectators) {
@@ -306,7 +329,7 @@ void Map::moveCreature(Creature& creature, Tile& newTile, bool forceTeleport/* =
 			//Use the correct stackpos
 			int32_t stackpos = oldStackPosVector[i++];
 			if (stackpos != -1) {
-				tmpPlayer->sendCreatureMove(&creature, newPos, newTile.getStackposOfCreature(tmpPlayer, &creature), oldPos, stackpos, teleport);
+				tmpPlayer->sendCreatureMove(&creature, newPos, newTile.getClientIndexOfCreature(tmpPlayer, &creature), oldPos, stackpos, teleport);
 			}
 		}
 	}
@@ -320,12 +343,12 @@ void Map::moveCreature(Creature& creature, Tile& newTile, bool forceTeleport/* =
 	newTile.postAddNotification(&creature, &oldTile, 0);
 }
 
-void Map::getSpectatorsInternal(SpectatorHashSet& spectators, const Position& centerPos, int32_t minRangeX, int32_t maxRangeX, int32_t minRangeY, int32_t maxRangeY, int32_t minRangeZ, int32_t maxRangeZ, bool onlyPlayers) const
+void Map::getSpectatorsInternal(SpectatorVec& spectators, const Position& centerPos, int32_t minRangeX, int32_t maxRangeX, int32_t minRangeY, int32_t maxRangeY, int32_t minRangeZ, int32_t maxRangeZ, bool onlyPlayers) const
 {
-	int_fast32_t min_y = centerPos.y + minRangeY;
-	int_fast32_t min_x = centerPos.x + minRangeX;
-	int_fast32_t max_y = centerPos.y + maxRangeY;
-	int_fast32_t max_x = centerPos.x + maxRangeX;
+	int_fast16_t min_y = centerPos.y + minRangeY;
+	int_fast16_t min_x = centerPos.x + minRangeX;
+	int_fast16_t max_y = centerPos.y + maxRangeY;
+	int_fast16_t max_x = centerPos.x + maxRangeX;
 
 	int32_t minoffset = centerPos.getZ() - maxRangeZ;
 	uint16_t x1 = std::min<uint32_t>(0xFFFF, std::max<int32_t>(0, (min_x + minoffset)));
@@ -360,7 +383,7 @@ void Map::getSpectatorsInternal(SpectatorHashSet& spectators, const Position& ce
 						continue;
 					}
 
-					spectators.insert(creature);
+					spectators.emplace_back(creature);
 				}
 				leafE = leafE->leafE;
 			} else {
@@ -376,7 +399,7 @@ void Map::getSpectatorsInternal(SpectatorHashSet& spectators, const Position& ce
 	}
 }
 
-void Map::getSpectators(SpectatorHashSet& spectators, const Position& centerPos, bool multifloor /*= false*/, bool onlyPlayers /*= false*/, int32_t minRangeX /*= 0*/, int32_t maxRangeX /*= 0*/, int32_t minRangeY /*= 0*/, int32_t maxRangeY /*= 0*/)
+void Map::getSpectators(SpectatorVec& spectators, const Position& centerPos, bool multifloor /*= false*/, bool onlyPlayers /*= false*/, int32_t minRangeX /*= 0*/, int32_t maxRangeX /*= 0*/, int32_t minRangeY /*= 0*/, int32_t maxRangeY /*= 0*/)
 {
 	if (centerPos.z >= MAP_MAX_LAYERS) {
 		return;
@@ -395,8 +418,7 @@ void Map::getSpectators(SpectatorHashSet& spectators, const Position& centerPos,
 			auto it = playersSpectatorCache.find(centerPos);
 			if (it != playersSpectatorCache.end()) {
 				if (!spectators.empty()) {
-					const SpectatorHashSet& cachedSpectators = it->second;
-					spectators.insert(cachedSpectators.begin(), cachedSpectators.end());
+					spectators.addSpectators(it->second);
 				} else {
 					spectators = it->second;
 				}
@@ -410,16 +432,16 @@ void Map::getSpectators(SpectatorHashSet& spectators, const Position& centerPos,
 			if (it != spectatorCache.end()) {
 				if (!onlyPlayers) {
 					if (!spectators.empty()) {
-						const SpectatorHashSet& cachedSpectators = it->second;
-						spectators.insert(cachedSpectators.begin(), cachedSpectators.end());
+						const SpectatorVec& cachedSpectators = it->second;
+						spectators.addSpectators(cachedSpectators);
 					} else {
 						spectators = it->second;
 					}
 				} else {
-					const SpectatorHashSet& cachedSpectators = it->second;
+					const SpectatorVec& cachedSpectators = it->second;
 					for (Creature* spectator : cachedSpectators) {
 						if (spectator->getPlayer()) {
-							spectators.insert(spectator);
+							spectators.emplace_back(spectator);
 						}
 					}
 				}
@@ -472,6 +494,10 @@ void Map::getSpectators(SpectatorHashSet& spectators, const Position& centerPos,
 void Map::clearSpectatorCache()
 {
 	spectatorCache.clear();
+}
+
+void Map::clearPlayersSpectatorCache()
+{
 	playersSpectatorCache.clear();
 }
 
@@ -972,21 +998,23 @@ uint32_t Map::clean() const
 	}
 
 	std::vector<Item*> toRemove;
+
 	for (auto tile : g_game.getTilesToClean()) {
-    if (!tile) {
-      continue;
-    }
-    if (auto items = tile->getItemList()) {
-      ++tiles;
-      for (auto item : *items) {
+		if (!tile) {
+			continue;
+		}
+
+		if (auto items = tile->getItemList()) {
+			++tiles;
+			for (auto item : *items) {
 				if (item->isCleanable()) {
 					toRemove.emplace_back(item);
 				}
-      }
+			}
 		}
 	}
 
-  for (auto item : toRemove) {
+	for (auto item : toRemove) {
 		g_game.internalRemoveItem(item, -1);
 	}
 
@@ -998,7 +1026,7 @@ uint32_t Map::clean() const
 	}
 
 	std::cout << "> CLEAN: Removed " << count << " item" << (count != 1 ? "s" : "")
-	          << " from " << tiles << " tile" << (tiles != 1 ? "s" : "") << " in "
-	          << (OTSYS_TIME() - start) / (1000.) << " seconds." << std::endl;
+		<< " from " << tiles << " tile" << (tiles != 1 ? "s" : "") << " in "
+		<< (OTSYS_TIME() - start) / (1000.) << " seconds." << std::endl;
 	return count;
 }

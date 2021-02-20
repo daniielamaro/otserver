@@ -30,8 +30,8 @@ enum RaidState_t {
 };
 
 struct MonsterSpawn {
-	MonsterSpawn(std::string initName, uint32_t initMinAmount, uint32_t initMaxAmount) :
-		name(std::move(initName)), minAmount(initMinAmount), maxAmount(initMaxAmount) {}
+	MonsterSpawn(std::string name, uint32_t minAmount, uint32_t maxAmount) :
+		name(std::move(name)), minAmount(minAmount), maxAmount(maxAmount) {}
 
 	std::string name;
 	uint32_t minAmount;
@@ -105,8 +105,8 @@ class Raids
 class Raid
 {
 	public:
-		Raid(std::string initName, uint32_t initInterval, uint32_t initMarginTime, bool initRepeat) :
-			name(std::move(initName)), interval(initInterval), margin(initMarginTime), repeat(initRepeat) {}
+		Raid(std::string name, uint32_t interval, uint32_t marginTime, bool repeat) :
+			name(std::move(name)), interval(interval), margin(marginTime), repeat(repeat) {}
 		~Raid();
 
 		// non-copyable
@@ -219,18 +219,10 @@ class ScriptEvent final : public RaidEvent, public Event
 			return false;
 		}
 
-		std::string& getScriptName() {
-			return scriptName;
-		}
-		void setScriptName(std::string name) {
-			scriptName = name;
-		}
-
 		bool executeEvent() override;
 
 	private:
 		std::string getScriptEventName() const override;
-		std::string scriptName;
 };
 
 #endif

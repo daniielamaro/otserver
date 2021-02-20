@@ -28,7 +28,7 @@ extern Game g_game;
 extern ConfigManager g_config;
 extern Events* g_events;
 
-Party::Party(Player* initLeader) : leader(initLeader)
+Party::Party(Player* leader) : leader(leader)
 {
 	leader->setParty(this);
 }
@@ -45,6 +45,7 @@ void Party::disband()
 	currentLeader->setParty(nullptr);
 	currentLeader->sendClosePrivate(CHANNEL_PARTY);
 	g_game.updatePlayerShield(currentLeader);
+	g_game.updatePlayerHelpers(*currentLeader);
 	currentLeader->sendCreatureSkull(currentLeader);
 	currentLeader->sendTextMessage(MESSAGE_INFO_DESCR, "Your party has been disbanded.");
 
@@ -69,6 +70,7 @@ void Party::disband()
 
 		member->sendCreatureSkull(currentLeader);
 		currentLeader->sendCreatureSkull(member);
+		g_game.updatePlayerHelpers(*member);
 	}
 	memberList.clear();
 	delete this;
@@ -110,10 +112,12 @@ bool Party::leaveParty(Player* player)
 	player->setParty(nullptr);
 	player->sendClosePrivate(CHANNEL_PARTY);
 	g_game.updatePlayerShield(player);
+	g_game.updatePlayerHelpers(*player);
 
 	for (Player* member : memberList) {
 		member->sendCreatureSkull(player);
 		player->sendPlayerPartyIcons(member);
+		g_game.updatePlayerHelpers(*member);
 	}
 
 	leader->sendCreatureSkull(player);
@@ -209,6 +213,8 @@ bool Party::joinParty(Player& player)
 
 	memberList.push_back(&player);
 
+	g_game.updatePlayerHelpers(player);
+
 	player.removePartyInvitation(this);
 	updateSharedExperience();
 
@@ -238,6 +244,12 @@ bool Party::removeInvite(Player& player, bool removeFromPlayer/* = true*/)
 
 	if (empty()) {
 		disband();
+	} else {
+		for (Player* member : memberList) {
+			g_game.updatePlayerHelpers(*member);
+		}
+
+		g_game.updatePlayerHelpers(*leader);
 	}
 
 	return true;
@@ -274,6 +286,11 @@ bool Party::invitePlayer(Player& player)
 	leader->sendTextMessage(MESSAGE_INFO_DESCR, ss.str());
 
 	inviteList.push_back(&player);
+
+	for (Player* member : memberList) {
+		g_game.updatePlayerHelpers(*member);
+	}
+	g_game.updatePlayerHelpers(*leader);
 
 	leader->sendCreatureShield(&player);
 	player.sendCreatureShield(leader);
@@ -330,19 +347,19 @@ void Party::updateSharedExperience()
 	}
 }
 
-bool Party::setSharedExperience(Player* player, bool newSharedExpActive)
+bool Party::setSharedExperience(Player* player, bool sharedExpActive)
 {
 	if (!player || leader != player) {
 		return false;
 	}
 
-	if (this->sharedExpActive == newSharedExpActive) {
+	if (this->sharedExpActive == sharedExpActive) {
 		return true;
 	}
 
-	this->sharedExpActive = newSharedExpActive;
+	this->sharedExpActive = sharedExpActive;
 
-	if (newSharedExpActive) {
+	if (sharedExpActive) {
 		this->sharedExpEnabled = canEnableSharedExperience();
 
 		if (this->sharedExpEnabled) {
@@ -362,6 +379,7 @@ void Party::shareExperience(uint64_t experience, Creature* source/* = nullptr*/)
 {
 	uint64_t shareExperience = experience;
 	g_events->eventPartyOnShareExperience(this, shareExperience);
+
 	for (Player* member : memberList) {
 		member->onGainSharedExperience(shareExperience, source);
 	}

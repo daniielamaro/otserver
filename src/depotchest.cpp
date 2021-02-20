@@ -1,8 +1,6 @@
 /**
- * @file depotchest.cpp
- * 
  * The Forgotten Server - a free and open-source MMORPG server emulator
- * Copyright (C) 2019 Mark Samman <mark.samman@gmail.com>
+ * Copyright (C) 2019  Mark Samman <mark.samman@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,12 +23,7 @@
 #include "tools.h"
 
 DepotChest::DepotChest(uint16_t type) :
-	Container(type)
-{
-	maxDepotItems = 2000;
-	maxSize = 32;
-	pagination = true;
-}
+	Container(type), maxDepotItems(1500) {}
 
 ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t count,
 		uint32_t flags, Creature* actor/* = nullptr*/) const
@@ -56,12 +49,7 @@ ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t cou
 			}
 		}
 
-		if (Cylinder* localParent = getRealParent()) {
-			if (localParent->getContainer()->getItemHoldingCount() + addCount > maxDepotItems) {
-				return RETURNVALUE_DEPOTISFULL;
-			}
-		}
-		else if (getItemHoldingCount() + addCount > maxDepotItems) {
+		if (getItemHoldingCount() + addCount > maxDepotItems) {
 			return RETURNVALUE_DEPOTISFULL;
 		}
 	}
@@ -71,24 +59,24 @@ ReturnValue DepotChest::queryAdd(int32_t index, const Thing& thing, uint32_t cou
 
 void DepotChest::postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t)
 {
-	Cylinder* localParent = getParent();
-	if (localParent != nullptr) {
-		localParent->postAddNotification(thing, oldParent, index, LINK_PARENT);
+	Cylinder* parent = getParent();
+	if (parent != nullptr) {
+		parent->postAddNotification(thing, oldParent, index, LINK_PARENT);
 	}
 }
 
 void DepotChest::postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, cylinderlink_t)
 {
-	Cylinder* localParent = getParent();
-	if (localParent != nullptr) {
-		localParent->postRemoveNotification(thing, newParent, index, LINK_PARENT);
+	Cylinder* parent = getParent();
+	if (parent != nullptr) {
+		parent->postRemoveNotification(thing, newParent, index, LINK_PARENT);
 	}
 }
 
 Cylinder* DepotChest::getParent() const
 {
-	if (parent && parent->getParent()) {
-		return parent->getParent()->getParent();
+	if (parent) {
+		return parent->getParent();
 	}
 	return nullptr;
 }

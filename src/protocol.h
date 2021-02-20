@@ -26,7 +26,7 @@
 class Protocol : public std::enable_shared_from_this<Protocol>
 {
 	public:
-		explicit Protocol(Connection_ptr initConnection) : connection(initConnection) {}
+		explicit Protocol(Connection_ptr connection) : connection(connection) {}
 		virtual ~Protocol() = default;
 
 		// non-copyable
@@ -35,7 +35,7 @@ class Protocol : public std::enable_shared_from_this<Protocol>
 
 		virtual void parsePacket(NetworkMessage&) {}
 
-		virtual void onSendMessage(const OutputMessage_ptr& msg);
+		virtual void onSendMessage(const OutputMessage_ptr& msg) const;
 		void onRecvMessage(NetworkMessage& msg);
 		virtual void onRecvFirstMessage(NetworkMessage& msg) = 0;
 		virtual void onConnect() {}
@@ -58,15 +58,15 @@ class Protocol : public std::enable_shared_from_this<Protocol>
 		}
 
 		void send(OutputMessage_ptr msg) const {
-			if (auto conn = getConnection()) {
-				conn->send(msg);
+			if (auto connection = getConnection()) {
+				connection->send(msg);
 			}
 		}
 
 	protected:
 		void disconnect() const {
-			if (auto conn = getConnection()) {
-				conn->close();
+			if (auto connection = getConnection()) {
+				connection->close();
 			}
 		}
 		void enableXTEAEncryption() {
@@ -78,12 +78,6 @@ class Protocol : public std::enable_shared_from_this<Protocol>
 		void disableChecksum() {
 			checksumEnabled = false;
 		}
-		void enableCompact() {
-			compactCrypt = true;
-		}
-		bool isCompact() {
-			return compactCrypt;
-		}
 
 		static bool RSA_decrypt(NetworkMessage& msg);
 
@@ -94,19 +88,14 @@ class Protocol : public std::enable_shared_from_this<Protocol>
 		virtual void release() {}
 
 	private:
-		void XTEA_encrypt(OutputMessage& msg) const;
-		bool XTEA_decrypt(NetworkMessage& msg) const;
-
 		friend class Connection;
 
 		OutputMessage_ptr outputBuffer;
 
 		const ConnectionWeak_ptr connection;
 		xtea::key key;
-		uint32_t sequenceNumber = 0;
 		bool encryptionEnabled = false;
 		bool checksumEnabled = true;
-		bool compactCrypt = false;
 		bool rawMessages = false;
 };
 

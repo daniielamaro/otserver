@@ -1,5 +1,4 @@
 local CHANNEL_HELP = 7
-local storage = 456112
 
 local muted = Condition(CONDITION_CHANNELMUTEDTICKS, CONDITIONID_DEFAULT)
 muted:setParameter(CONDITION_PARAM_SUBID, CHANNEL_HELP)
@@ -12,7 +11,7 @@ function onSpeak(player, type, message)
 		return false
 	end
 
-	if player:getStorageValue(storage) > os.time() then
+	if player:getCondition(CONDITION_CHANNELMUTEDTICKS, CONDITIONID_DEFAULT, CHANNEL_HELP) then
 		player:sendCancelMessage("You are muted from the Help channel for using it inappropriately.")
 		return false
 	end
@@ -25,7 +24,6 @@ function onSpeak(player, type, message)
 				if playerAccountType > target:getAccountType() then
 					if not target:getCondition(CONDITION_CHANNELMUTEDTICKS, CONDITIONID_DEFAULT, CHANNEL_HELP) then
 						target:addCondition(muted)
-						target:setStorageValue(storage, os.time() + 180)
 						sendChannelMessage(CHANNEL_HELP, TALKTYPE_CHANNEL_R1, target:getName() .. " has been muted by " .. player:getName() .. " for using Help Channel inappropriately.")
 					else
 						player:sendCancelMessage("That player is already muted.")
@@ -42,10 +40,9 @@ function onSpeak(player, type, message)
 			local target = Player(targetName)
 			if target then
 				if playerAccountType > target:getAccountType() then
-					if target:getStorageValue(storage) > os.time() then
+					if target:getCondition(CONDITION_CHANNELMUTEDTICKS, CONDITIONID_DEFAULT, CHANNEL_HELP) then
 						target:removeCondition(CONDITION_CHANNELMUTEDTICKS, CONDITIONID_DEFAULT, CHANNEL_HELP)
-						sendChannelMessage(CHANNEL_HELP, TALKTYPE_CHANNEL_R1, target:getName() .. " has been unmuted.")
-						target:setStorageValue(storage, -1)
+						sendChannelMessage(CHANNEL_HELP, TALKTYPE_CHANNEL_R1, target:getName() .. " has been unmuted by " .. player:getName() .. ".")
 					else
 						player:sendCancelMessage("That player is not muted.")
 					end

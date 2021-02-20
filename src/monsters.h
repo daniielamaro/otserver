@@ -24,44 +24,25 @@
 
 
 const uint32_t MAX_LOOTCHANCE = 100000;
-const uint32_t MAX_STATICWALK = 100;
 
 struct LootBlock {
 	uint16_t id;
 	uint32_t countmax;
-	uint32_t countmin;
 	uint32_t chance;
 
 	//optional
 	int32_t subType;
 	int32_t actionId;
 	std::string text;
-	std::string name;
-	std::string article;
-	int32_t attack;
-	int32_t defense;
-	int32_t extraDefense;
-	int32_t armor;
-	int32_t shootRange;
-	int32_t hitChance;
-	bool unique;
 
 	std::vector<LootBlock> childLoot;
 	LootBlock() {
 		id = 0;
 		countmax = 1;
-		countmin = 1;
 		chance = 0;
 
 		subType = -1;
 		actionId = -1;
-		attack = -1;
-		defense = -1;
-		extraDefense = -1;
-		armor = -1;
-		shootRange = -1;
-		hitChance = -1;
-		unique = false;
 	}
 };
 
@@ -123,8 +104,6 @@ class MonsterType
 		LuaScriptInterface* scriptInterface;
 
 		std::map<CombatType_t, int32_t> elementMap;
-		std::map<CombatType_t, int32_t> reflectMap;
-		std::map<CombatType_t, int32_t> healingMap;
 
 		std::vector<voiceBlock_t> voiceVector;
 
@@ -137,7 +116,6 @@ class MonsterType
 		Skulls_t skull = SKULL_NONE;
 		Outfit_t outfit = {};
 		RaceType_t race = RACE_BLOOD;
-		RespawnType respawnType = {};
 
 		LightInfo light = {};
 		uint16_t lookcorpse = 0;
@@ -154,18 +132,6 @@ class MonsterType
 		uint32_t damageImmunities = 0;
 		uint32_t baseSpeed = 200;
 
-		// Bestiary
-		uint8_t bestiaryOccurrence = 0;
-		uint8_t bestiaryStars = 0;
-		uint16_t bestiaryToUnlock = 0;
-		uint16_t bestiaryFirstUnlock = 0;
-		uint16_t bestiarySecondUnlock = 0;
-		uint16_t bestiaryCharmsPoints = 0;
-		uint16_t raceid = 0;
-		std::string bestiaryLocations;
-		std::string bestiaryClass; // String (addString)
-		BestiaryType_t bestiaryRace = BESTY_RACE_NONE; // Number (addByte)
-
 		int32_t creatureAppearEvent = -1;
 		int32_t creatureDisappearEvent = -1;
 		int32_t creatureMoveEvent = -1;
@@ -178,10 +144,6 @@ class MonsterType
 		int32_t changeTargetChance = 0;
 		int32_t defense = 0;
 		int32_t armor = 0;
-		int32_t targetStrategiesNearestPercent = 0;
-		int32_t targetStrategiesLowerHPPercent = 0;
-		int32_t targetStrategiesMostDamagePercent = 0;
-		int32_t targetStrategiesRandom = 0;
 
 		bool canPushItems = false;
 		bool canPushCreatures = false;
@@ -192,9 +154,7 @@ class MonsterType
 		bool isAttackable = true;
 		bool isHostile = true;
 		bool hiddenHealth = false;
-		bool isBlockable = false;
-		bool isPet = false;
-		bool isRewardBoss = false;
+		bool isBoss = false;
 		bool canWalkOnEnergy = true;
 		bool canWalkOnFire = true;
 		bool canWalkOnPoison = true;
@@ -216,9 +176,7 @@ class MonsterType
 
 		MonsterInfo info;
 
-		void loadLoot(MonsterType* monsterType, LootBlock lootblock);
-
-		bool canSpawn(const Position& pos);
+		void loadLoot(MonsterType* monsterType, LootBlock lootBlock);
 };
 
 class MonsterSpell
@@ -248,7 +206,8 @@ class MonsterSpell
 		int32_t conditionMaxDamage = 0;
 		int32_t conditionStartDamage = 0;
 		int32_t tickInterval = 0;
-		int32_t speedChange = 0;
+		int32_t minSpeedChange = 0;
+		int32_t maxSpeedChange = 0;
 		int32_t duration = 0;
 
 		bool isScripted = false;
@@ -258,9 +217,6 @@ class MonsterSpell
 		bool isMelee = false;
 
 		Outfit_t outfit = {};
-		std::string outfitMonster = "";
-		uint16_t outfitItem = 0;
-
 		ShootType_t shoot = CONST_ANI_NONE;
 		MagicEffectClasses effect = CONST_ME_NONE;
 		ConditionType_t conditionType = CONDITION_NONE;
@@ -281,9 +237,7 @@ class Monsters
 		}
 		bool reload();
 
-		MonsterType* getMonsterType(const std::string& name);
-		MonsterType* getMonsterTypeByRaceId(uint16_t thisrace);
-		void addMonsterType(const std::string& name, MonsterType* mType);
+		MonsterType* getMonsterType(const std::string& name, bool loadFromFile = true);
 		bool deserializeSpell(MonsterSpell* spell, spellBlock_t& sb, const std::string& description = "");
 
 		std::unique_ptr<LuaScriptInterface> scriptInterface;
@@ -291,7 +245,7 @@ class Monsters
 
 	private:
 		ConditionDamage* getDamageCondition(ConditionType_t conditionType,
-											int32_t maxDamage, int32_t minDamage, int32_t startDamage, uint32_t tickInterval);
+		                                    int32_t maxDamage, int32_t minDamage, int32_t startDamage, uint32_t tickInterval);
 		bool deserializeSpell(const pugi::xml_node& node, spellBlock_t& sb, const std::string& description = "");
 
 		MonsterType* loadMonster(const std::string& file, const std::string& monsterName, bool reloading = false);

@@ -1,0 +1,58 @@
+FROM ubuntu:20.04
+
+ENV TZ=America/Los_Angeles
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+RUN apt-get update -y
+
+RUN sed '1 a deb http://ftp.br.debian.org/debian sid main' /etc/apt/sources.list
+
+RUN apt-get update -y && apt-get upgrade -y
+
+RUN apt-get install -y \
+  git \
+	cmake \
+	build-essential \
+	libluajit-5.1-dev \
+	libmysqlclient-dev \
+	libboost-system-dev \
+	libboost-iostreams-dev \
+	libboost-filesystem-dev \
+	libpugixml-dev \
+	libcrypto++-dev \
+	libboost-date-time-dev \
+  unzip
+
+ENV TZ="America/Sao_Paulo" \
+  LANG="pt_BR.UTF-8" \
+  LANGUAGE="pt_BR:pt:en" \
+  LC_CTYPE="pt_BR.UTF-8" \
+  LC_NUMERIC="pt_BR.UTF-8" \
+  LC_TIME="pt_BR.UTF-8" \
+  LC_COLLATE="pt_BR.UTF-8" \
+  LC_MONETARY="pt_BR.UTF-8" \
+  LC_MESSAGES="pt_BR.UTF-8" \
+  LC_PAPER="pt_BR.UTF-8" \
+  LC_NAME="pt_BR.UTF-8" \
+  LC_ADDRESS="pt_BR.UTF-8" \
+  LC_TELEPHONE="pt_BR.UTF-8" \
+  LC_MEASUREMENT="pt_BR.UTF-8" \
+  LC_IDENTIFICATION="pt_BR.UTF-8"
+
+WORKDIR /opt/otserver
+
+COPY . .
+
+RUN rm -rf build && mkdir build && cd build && cmake .. && make && sleep 5 && cp tfs /opt/otserver
+
+COPY config.lua.dist ./
+
+RUN cp config.lua.dist config.lua \
+  && sed -i '/mysqlHost = .*$/c\mysqlHost = "otdb"' config.lua \
+  && sed -i '/mysqlUser = .*$/c\mysqlUser = "otserver"' config.lua \
+  && sed -i '/mysqlPass = .*$/c\mysqlPass = "otserver"' config.lua \
+  && sed -i '/mysqlDatabase = .*$/c\mysqlDatabase = "otserver"' config.lua \
+  && unzip -o data/world/world.zip -d data/world/
+
+ENTRYPOINT /opt/otserver/tfs
+

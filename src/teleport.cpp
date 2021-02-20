@@ -65,7 +65,13 @@ Cylinder* Teleport::queryDestination(int32_t&, const Thing&, Item**, uint32_t&)
 	return this;
 }
 
-bool Teleport::checkInfinityLoop(Tile* destTile) {
+void Teleport::addThing(Thing* thing)
+{
+	return addThing(0, thing);
+}
+
+bool Teleport::checkInfinityLoop(Tile* destTile)
+{
 	if (!destTile) {
 		return false;
 	}
@@ -80,11 +86,6 @@ bool Teleport::checkInfinityLoop(Tile* destTile) {
 	return false;
 }
 
-void Teleport::addThing(Thing* thing)
-{
-	return addThing(0, thing);
-}
-
 void Teleport::addThing(int32_t, Thing* thing)
 {
 	Tile* destTile = g_game.map.getTile(destPos);
@@ -95,7 +96,7 @@ void Teleport::addThing(int32_t, Thing* thing)
 	// Prevent infinity loop
 	if (checkInfinityLoop(destTile)) {
 		const Position& pos = getPosition();
-		std::cout << "[Warning - Teleport:addThing] Infinity loop teleport at position: " << pos << std::endl;
+		std::cout << "Warning: infinity loop teleport. " << pos << std::endl;
 		return;
 	}
 
@@ -114,7 +115,7 @@ void Teleport::addThing(int32_t, Thing* thing)
 			g_game.addMagicEffect(destTile->getPosition(), effect);
 			g_game.addMagicEffect(item->getPosition(), effect);
 		}
-		g_game.internalMoveItem(getTile(), destTile, INDEX_WHEREEVER, item, item->getItemCount(), nullptr);
+		g_game.internalMoveItem(getTile(), destTile, INDEX_WHEREEVER, item, item->getItemCount(), nullptr, FLAG_NOLIMIT);
 	}
 }
 

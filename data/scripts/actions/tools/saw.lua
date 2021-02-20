@@ -1,12 +1,11 @@
 local saw = Action()
 
 function saw.onUse(player, item, fromPosition, target, toPosition, isHotkey)
-	if target.itemid ~= 5901 then
+	if target.itemid ~= 5901 then -- wood
 		return false
 	end
 
-	target:transform(10033)
-	toPosition:sendMagicEffect(CONST_ME_POFF) --Not sure if there's any magic effect when you use saw?
+	target:transform(10033) -- wooden ties
 	return true
 end
 

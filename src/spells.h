@@ -58,8 +58,6 @@ class Spells final : public BaseEvents
 		static Position getCasterPosition(Creature* creature, Direction dir);
 		std::string getScriptBaseName() const override;
 
-		std::list<uint16_t> getSpellsByVocation(uint16_t vocationId);
-
 		const std::map<std::string, InstantSpell>& getInstantSpells() const {
 			return instants;
 		};
@@ -209,13 +207,13 @@ class Spell : public BaseSpell
 			vocSpellMap[n] = b;
 		}
 
-		SpellGroup_t getGroup() {
+		const SpellGroup_t getGroup() const {
 			return group;
 		}
 		void setGroup(SpellGroup_t g) {
 			group = g;
 		}
-		SpellGroup_t getSecondaryGroup() {
+		const SpellGroup_t getSecondaryGroup() const {
 			return secondaryGroup;
 		}
 		void setSecondaryGroup(SpellGroup_t g) {
@@ -251,9 +249,6 @@ class Spell : public BaseSpell
 		bool getNeedTarget() const {
 			return needTarget;
 		}
-		bool getPzOnUse() const {
-			return pzLocked;
-		}		
 		void setNeedTarget(bool n) {
 			needTarget = n;
 		}
@@ -293,6 +288,12 @@ class Spell : public BaseSpell
 		void setAggressive(bool a) {
 			aggressive = a;
 		}
+		bool getPzLock() const {
+			return pzLock;
+		}
+		void setPzLock(bool pzLock) {
+			this->pzLock = pzLock;
+		}
 
 		SpellType_t spellType = SPELL_UNDEFINED;
 
@@ -328,10 +329,10 @@ class Spell : public BaseSpell
 		bool blockingSolid = false;
 		bool blockingCreature = false;
 		bool aggressive = true;
+		bool pzLock = false;
 		bool learnable = false;
 		bool enabled = true;
 		bool premium = false;
-		bool pzLocked = false;
 
 
 	private:

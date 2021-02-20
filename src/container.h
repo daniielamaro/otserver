@@ -24,12 +24,12 @@
 
 #include "cylinder.h"
 #include "item.h"
+#include "tile.h"
 
 class Container;
 class DepotChest;
 class DepotLocker;
-class RewardChest;
-class Reward;
+class StoreInbox;
 
 class ContainerIterator
 {
@@ -53,7 +53,7 @@ class Container : public Item, public Cylinder
 	public:
 		explicit Container(uint16_t type);
 		Container(uint16_t type, uint16_t size, bool unlocked = true, bool pagination = false);
-		explicit Container(Tile* type);
+		explicit Container(Tile* tile);
 		~Container();
 
 		// non-copyable
@@ -76,17 +76,10 @@ class Container : public Item, public Cylinder
 			return nullptr;
 		}
 
-		virtual RewardChest* getRewardChest() {
+		virtual StoreInbox* getStoreInbox() {
 			return nullptr;
 		}
-		virtual const RewardChest* getRewardChest() const {
-			return nullptr;
-		}
-
-		virtual Reward* getReward() {
-			return nullptr;
-		}
-		virtual const Reward* getReward() const {
+		virtual const StoreInbox* getStoreInbox() const {
 			return nullptr;
 		}
 
@@ -117,14 +110,14 @@ class Container : public Item, public Cylinder
 			return itemlist.rend();
 		}
 
+		std::string getName(bool addArticle = false) const;
+
 		bool hasParent() const;
 		void addItem(Item* item);
 		Item* getItemByIndex(size_t index) const;
 		bool isHoldingItem(const Item* item) const;
 
 		uint32_t getItemHoldingCount() const;
-		uint32_t getContainerHoldingCount() const;
-		uint16_t getFreeSlots() const;
 		uint32_t getWeight() const override final;
 
 		bool isUnlocked() const {
@@ -159,6 +152,8 @@ class Container : public Item, public Cylinder
 		std::map<uint32_t, uint32_t>& getAllItemTypeCount(std::map<uint32_t, uint32_t>& countMap) const override final;
 		Thing* getThing(size_t index) const override final;
 
+		ItemVector getItems(bool recursive = false);
+
 		void postAddNotification(Thing* thing, const Cylinder* oldParent, int32_t index, cylinderlink_t link = LINK_OWNER) override;
 		void postRemoveNotification(Thing* thing, const Cylinder* newParent, int32_t index, cylinderlink_t link = LINK_OWNER) override;
 
@@ -167,23 +162,23 @@ class Container : public Item, public Cylinder
 		void startDecaying() override final;
 
 	protected:
+		ItemDeque itemlist;
+
+	private:
 		std::ostringstream& getContentDescription(std::ostringstream& os) const;
 
 		uint32_t maxSize;
 		uint32_t totalWeight = 0;
-		ItemDeque itemlist;
 		uint32_t serializationCount = 0;
 
 		bool unlocked;
 		bool pagination;
 
-	private:
 		void onAddContainerItem(Item* item);
 		void onUpdateContainerItem(uint32_t index, Item* oldItem, Item* newItem);
 		void onRemoveContainerItem(uint32_t index, Item* item);
 
 		Container* getParentContainer();
-		Container* getTopParentContainer() const;
 		void updateItemWeight(int32_t diff);
 
 		friend class ContainerIterator;

@@ -32,10 +32,9 @@ using CreatureList = std::list<Creature*>;
 
 enum TargetSearchType_t {
 	TARGETSEARCH_DEFAULT,
+	TARGETSEARCH_RANDOM,
+	TARGETSEARCH_ATTACKRANGE,
 	TARGETSEARCH_NEAREST,
-	TARGETSEARCH_HP,
-	TARGETSEARCH_DAMAGE,
-	TARGETSEARCH_RANDOM
 };
 
 class Monster final : public Creature
@@ -98,13 +97,13 @@ class Monster final : public Creature
 		int32_t getDefense() const override {
 			return mType->info.defense;
 		}
-
 		bool isPushable() const override {
 			return mType->info.pushable && baseSpeed != 0;
 		}
 		bool isAttackable() const override {
 			return mType->info.isAttackable;
 		}
+
 		bool canPushItems() const {
 			return mType->info.canPushItems;
 		}
@@ -114,9 +113,6 @@ class Monster final : public Creature
 		bool isHostile() const {
 			return mType->info.isHostile;
 		}
-		bool isPet() const {
-			return mType->info.isPet;
-		}
 		bool canSee(const Position& pos) const override;
 		bool canSeeInvisibility() const override {
 			return isImmune(CONDITION_INVISIBLE);
@@ -124,17 +120,12 @@ class Monster final : public Creature
 		uint32_t getManaCost() const {
 			return mType->info.manaCost;
 		}
-		RespawnType getRespawnType() const {
-			return mType->info.respawnType;
+		void setSpawn(Spawn* spawn) {
+			this->spawn = spawn;
 		}
-		void setSpawn(Spawn* newSpawn) {
-			this->spawn = newSpawn;
-		}
-
-		uint32_t getReflectValue(CombatType_t combatType) const;
-		uint32_t getHealingCombatValue(CombatType_t healingType) const;
-
 		bool canWalkOnFieldType(CombatType_t combatType) const;
+
+
 		void onAttackedCreatureDisappear(bool isLogout) override;
 
 		void onCreatureAppear(Creature* creature, bool isLogin) override;
@@ -144,7 +135,7 @@ class Monster final : public Creature
 
 		void drainHealth(Creature* attacker, int32_t damage) override;
 		void changeHealth(int32_t healthChange, bool sendHealthChange = true) override;
-		void onCreatureWalk() override;
+		void onWalk() override;
 		bool getNextStep(Direction& direction, uint32_t& flags) override;
 		void onFollowCreatureComplete(const Creature* creature) override;
 
@@ -157,7 +148,7 @@ class Monster final : public Creature
 
 		void doAttacking(uint32_t interval) override;
 		bool hasExtraSwing() override {
-			return extraMeleeAttack;
+			return lastMeleeAttack == 0;
 		}
 
 		bool searchTarget(TargetSearchType_t searchType = TARGETSEARCH_DEFAULT);
@@ -182,18 +173,9 @@ class Monster final : public Creature
 		bool isIgnoringFieldDamage() const {
 			return ignoreFieldDamage;
 		}
-		bool israndomStepping() const {
-			return randomStepping;
-		}
-		void setIgnoreFieldDamage(bool ignore) {
-			ignoreFieldDamage = ignore;
-		}
-		bool getIgnoreFieldDamage() const {
-			return ignoreFieldDamage;
-		}
 
 		BlockType_t blockHit(Creature* attacker, CombatType_t combatType, int32_t& damage,
-							 bool checkDefense = false, bool checkArmor = false, bool field = false) override;
+		                     bool checkDefense = false, bool checkArmor = false, bool field = false, bool ignoreResistances = false) override;
 
 		static uint32_t monsterAutoID;
 
@@ -222,7 +204,6 @@ class Monster final : public Creature
 		Position masterPos;
 
 		bool isIdle = true;
-		bool extraMeleeAttack = false;
 		bool isMasterInRange = false;
 		bool randomStepping = false;
 		bool ignoreFieldDamage = false;
@@ -256,10 +237,10 @@ class Monster final : public Creature
 
 		bool canUseAttack(const Position& pos, const Creature* target) const;
 		bool canUseSpell(const Position& pos, const Position& targetPos,
-						 const spellBlock_t& sb, uint32_t interval, bool& inRange, bool& resetTicks);
+		                 const spellBlock_t& sb, uint32_t interval, bool& inRange, bool& resetTicks);
 		bool getRandomStep(const Position& creaturePos, Direction& direction) const;
 		bool getDanceStep(const Position& creaturePos, Direction& direction,
-						  bool keepAttack = true, bool keepDistance = true);
+		                  bool keepAttack = true, bool keepDistance = true);
 		bool isInSpawnRange(const Position& pos) const;
 		bool canWalkTo(Position pos, Direction direction) const;
 
@@ -294,7 +275,6 @@ class Monster final : public Creature
 		}
 
 		friend class LuaScriptInterface;
-		friend class Map;
 };
 
 #endif

@@ -62,7 +62,7 @@ class Service final : public ServiceBase
 class ServicePort : public std::enable_shared_from_this<ServicePort>
 {
 	public:
-		explicit ServicePort(boost::asio::io_service& init_io_service) : io_service(init_io_service) {}
+		explicit ServicePort(boost::asio::io_service& io_service) : io_service(io_service) {}
 		~ServicePort();
 
 		// non-copyable
@@ -119,7 +119,7 @@ class ServiceManager
 
 		boost::asio::io_service io_service;
 		Signals signals{io_service};
-		boost::asio::deadline_timer death_timer { io_service };
+		boost::asio::steady_timer death_timer { io_service };
 		bool running = false;
 };
 

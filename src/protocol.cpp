@@ -26,25 +26,55 @@
 
 extern RSA g_RSA;
 
-void Protocol::onSendMessage(const OutputMessage_ptr& msg)
+namespace {
+
+void XTEA_encrypt(OutputMessage& msg, const xtea::key& key)
+{
+	// The message must be a multiple of 8
+	size_t paddingBytes = msg.getLength() % 8u;
+	if (paddingBytes != 0) {
+		msg.addPaddingBytes(8 - paddingBytes);
+	}
+
+	uint8_t* buffer = msg.getOutputBuffer();
+	xtea::encrypt(buffer, msg.getLength(), key);
+}
+
+bool XTEA_decrypt(NetworkMessage& msg, const xtea::key& key)
+{
+	if (((msg.getLength() - 6) & 7) != 0) {
+		return false;
+	}
+
+	uint8_t* buffer = msg.getBuffer() + msg.getBufferPosition();
+	xtea::decrypt(buffer, msg.getLength() - 6, key);
+
+	uint16_t innerLength = msg.get<uint16_t>();
+	if (innerLength + 8 > msg.getLength()) {
+		return false;
+	}
+
+	msg.setLength(innerLength);
+	return true;
+}
+
+}
+
+void Protocol::onSendMessage(const OutputMessage_ptr& msg) const
 {
 	if (!rawMessages) {
 		msg->writeMessageLength();
 
 		if (encryptionEnabled) {
-			XTEA_encrypt(*msg);
-			if (!compactCrypt) {
-				msg->addCryptoHeader((checksumEnabled ? 1 : 0), sequenceNumber);
-			} else {
-				msg->addCryptoHeader(2, sequenceNumber);
-			}
+			XTEA_encrypt(*msg, key);
+			msg->addCryptoHeader(checksumEnabled);
 		}
 	}
 }
 
 void Protocol::onRecvMessage(NetworkMessage& msg)
 {
-	if (encryptionEnabled && !XTEA_decrypt(msg)) {
+	if (encryptionEnabled && !XTEA_decrypt(msg, key)) {
 		return;
 	}
 
@@ -63,36 +93,6 @@ OutputMessage_ptr Protocol::getOutputBuffer(int32_t size)
 	return outputBuffer;
 }
 
-void Protocol::XTEA_encrypt(OutputMessage& msg) const
-{
-	// The message must be a multiple of 8
-	size_t paddingBytes = msg.getLength() % 8u;
-	if (paddingBytes != 0) {
-		msg.addPaddingBytes(8 - paddingBytes);
-	}
-
-	uint8_t* buffer = msg.getOutputBuffer();
-	xtea::encrypt(buffer, msg.getLength(), key);
-}
-
-bool Protocol::XTEA_decrypt(NetworkMessage& msg) const
-{
-	if (((msg.getLength() - 6) & 7) != 0) {
-		return false;
-	}
-
-	uint8_t* buffer = msg.getBuffer() + msg.getBufferPosition();
-	xtea::decrypt(buffer, msg.getLength() - 6, key);
-
-	uint16_t innerLength = msg.get<uint16_t>();
-	if (innerLength + 8 > msg.getLength()) {
-		return false;
-	}
-
-	msg.setLength(innerLength);
-	return true;
-}
-
 bool Protocol::RSA_decrypt(NetworkMessage& msg)
 {
 	if ((msg.getLength() - msg.getBufferPosition()) < 128) {
@@ -105,8 +105,8 @@ bool Protocol::RSA_decrypt(NetworkMessage& msg)
 
 uint32_t Protocol::getIP() const
 {
-	if (auto conn = getConnection()) {
-		return conn->getIP();
+	if (auto connection = getConnection()) {
+		return connection->getIP();
 	}
 
 	return 0;

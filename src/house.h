@@ -116,7 +116,7 @@ class HouseTransferItem final : public Item
 	public:
 		static HouseTransferItem* createHouseTransferItem(House* house);
 
-		explicit HouseTransferItem(House* newHouse) : Item(0), house(newHouse) {}
+		explicit HouseTransferItem(House* house) : Item(0), house(house) {}
 
 		void onTradeEvent(TradeEvents_t event, Player* owner) override;
 		bool canTransform() const override {
@@ -154,8 +154,8 @@ class House
 			return posEntry;
 		}
 
-		void setName(std::string newHouseName) {
-			this->houseName = newHouseName;
+		void setName(std::string houseName) {
+			this->houseName = houseName;
 		}
 		const std::string& getName() const {
 			return houseName;
@@ -173,8 +173,8 @@ class House
 			return paidUntil;
 		}
 
-		void setRent(uint32_t newRent) {
-			this->rent = newRent;
+		void setRent(uint32_t rent) {
+			this->rent = rent;
 		}
 		uint32_t getRent() const {
 			return rent;
@@ -187,8 +187,8 @@ class House
 			return rentWarnings;
 		}
 
-		void setTownId(uint32_t newTownId) {
-			this->townId = newTownId;
+		void setTownId(uint32_t townId) {
+			this->townId = townId;
 		}
 		uint32_t getTownId() const {
 			return townId;
@@ -205,14 +205,14 @@ class House
 
 		HouseTransferItem* getTransferItem();
 		void resetTransferItem();
-		bool executeTransfer(HouseTransferItem* item, Player* player);
+		bool executeTransfer(HouseTransferItem* item, Player* newOwner);
 
 		const HouseTileList& getTiles() const {
 			return houseTiles;
 		}
 
-		const std::list<Door*>& getDoors() const {
-			return doorList;
+		const std::set<Door*>& getDoors() const {
+			return doorSet;
 		}
 
 		void addBed(BedItem* bed);
@@ -233,7 +233,7 @@ class House
 		Container transfer_container{ITEM_LOCKER1};
 
 		HouseTileList houseTiles;
-		std::list<Door*> doorList;
+		std::set<Door*> doorSet;
 		HouseBedItemList bedsList;
 
 		std::string houseName;

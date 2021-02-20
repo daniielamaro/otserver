@@ -41,16 +41,16 @@ const WildcardTreeNode* WildcardTreeNode::getChild(char ch) const
 	return &it->second;
 }
 
-WildcardTreeNode* WildcardTreeNode::addChild(char ch, bool breakp)
+WildcardTreeNode* WildcardTreeNode::addChild(char ch, bool breakpoint)
 {
 	WildcardTreeNode* child = getChild(ch);
 	if (child) {
-		if (breakp && !child->breakpoint) {
+		if (breakpoint && !child->breakpoint) {
 			child->breakpoint = true;
 		}
 	} else {
 		auto pair = children.emplace(std::piecewise_construct,
-				std::forward_as_tuple(ch), std::forward_as_tuple(breakp));
+				std::forward_as_tuple(ch), std::forward_as_tuple(breakpoint));
 		child = &pair.first->second;
 	}
 	return child;

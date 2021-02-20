@@ -19,8 +19,6 @@
 
 #include "otpch.h"
 
-#include "tile.h"
-#include "monster.h"
 #include "housetile.h"
 #include "house.h"
 #include "game.h"
@@ -29,8 +27,8 @@
 extern Game g_game;
 extern ConfigManager g_config;
 
-HouseTile::HouseTile(int32_t initX, int32_t initY, int32_t initZ, House* initHouse) :
-	DynamicTile(initX, initY, initZ), house(initHouse) {}
+HouseTile::HouseTile(int32_t x, int32_t y, int32_t z, House* house) :
+	DynamicTile(x, y, z), house(house) {}
 
 void HouseTile::addThing(int32_t index, Thing* thing)
 {
@@ -77,38 +75,32 @@ void HouseTile::updateHouse(Item* item)
 	}
 }
 
-ReturnValue HouseTile::queryAdd(int32_t index, const Thing& thing, uint32_t count, uint32_t tileFlags, Creature* actor/* = nullptr*/) const
+ReturnValue HouseTile::queryAdd(int32_t index, const Thing& thing, uint32_t count, uint32_t flags, Creature* actor/* = nullptr*/) const
 {
 	if (const Creature* creature = thing.getCreature()) {
 		if (const Player* player = creature->getPlayer()) {
 			if (!house->isInvited(player)) {
 				return RETURNVALUE_PLAYERISNOTINVITED;
 			}
+		} else {
+			return RETURNVALUE_NOTPOSSIBLE;
 		}
-		else if (const Monster* monster = creature->getMonster()) {
-			if (monster->isSummon()) {
-				if (!house->isInvited(monster->getMaster()->getPlayer())) {
-					return RETURNVALUE_NOTPOSSIBLE;
-				}
-				if (house->isInvited(monster->getMaster()->getPlayer()) && (hasFlag(TILESTATE_BLOCKSOLID) || (hasBitSet(FLAG_PATHFINDING, flags) && hasFlag(TILESTATE_NOFIELDBLOCKPATH)))) {
-					return RETURNVALUE_NOTPOSSIBLE;
-				} 
-				else {
-					return RETURNVALUE_NOERROR;
-				}
+	} else if (const Item* item = thing.getItem()) {
+		if (item->isStoreItem() && !item->hasAttribute(ITEM_ATTRIBUTE_WRAPID)) {
+			return RETURNVALUE_ITEMCANNOTBEMOVEDTHERE;
+		}
+
+		if (actor) {
+			Player* actorPlayer = actor->getPlayer();
+			if (!house->isInvited(actorPlayer)) {
+				return RETURNVALUE_CANNOTTHROW;
 			}
 		}
 	}
-	else if (thing.getItem() && actor) {
-		Player* actorPlayer = actor->getPlayer();
-		if (!house->isInvited(actorPlayer)) {
-			return RETURNVALUE_CANNOTTHROW;
-		}
-	}
-	return Tile::queryAdd(index, thing, count, tileFlags, actor);
+	return Tile::queryAdd(index, thing, count, flags, actor);
 }
 
-Tile* HouseTile::queryDestination(int32_t& index, const Thing& thing, Item** destItem, uint32_t& tileFlags)
+Tile* HouseTile::queryDestination(int32_t& index, const Thing& thing, Item** destItem, uint32_t& flags)
 {
 	if (const Creature* creature = thing.getCreature()) {
 		if (const Player* player = creature->getPlayer()) {
@@ -117,9 +109,9 @@ Tile* HouseTile::queryDestination(int32_t& index, const Thing& thing, Item** des
 				Tile* destTile = g_game.map.getTile(entryPos);
 				if (!destTile) {
 					std::cout << "Error: [HouseTile::queryDestination] House entry not correct"
-						<< " - Name: " << house->getName()
-						<< " - House id: " << house->getId()
-						<< " - Tile not found: " << entryPos << std::endl;
+					          << " - Name: " << house->getName()
+					          << " - House id: " << house->getId()
+					          << " - Tile not found: " << entryPos << std::endl;
 
 					destTile = g_game.map.getTile(player->getTemplePosition());
 					if (!destTile) {
@@ -134,7 +126,7 @@ Tile* HouseTile::queryDestination(int32_t& index, const Thing& thing, Item** des
 		}
 	}
 
-	return Tile::queryDestination(index, thing, destItem, tileFlags);
+	return Tile::queryDestination(index, thing, destItem, flags);
 }
 
 ReturnValue HouseTile::queryRemove(const Thing& thing, uint32_t count, uint32_t flags, Creature* actor /*= nullptr*/) const

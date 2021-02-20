@@ -25,15 +25,11 @@
 #include "weapons.h"
 #include "configmanager.h"
 #include "events.h"
-#include "monster.h"
-#include "iobestiary.h"
-#include "monsters.h"
 
 extern Game g_game;
 extern Weapons* g_weapons;
 extern ConfigManager g_config;
 extern Events* g_events;
-extern Monsters g_monsters;
 
 CombatDamage Combat::getCombatDamage(Creature* creature, Creature* target) const
 {
@@ -51,35 +47,19 @@ CombatDamage Combat::getCombatDamage(Creature* creature, Creature* target) const
 			damage.primary.value = normal_random(min, max);
 		} else if (Player* player = creature->getPlayer()) {
 			if (params.valueCallback) {
-				params.valueCallback->getMinMaxValues(player, damage, params.useCharges);
+				params.valueCallback->getMinMaxValues(player, damage);
 			} else if (formulaType == COMBAT_FORMULA_LEVELMAGIC) {
 				int32_t levelFormula = player->getLevel() * 2 + player->getMagicLevel() * 3;
-				damage.primary.value = normal_random(
-					static_cast<int32_t>(levelFormula * mina + minb),
-					static_cast<int32_t>(levelFormula * maxa + maxb)
-				);
+				damage.primary.value = normal_random(std::fma(levelFormula, mina, minb), std::fma(levelFormula, maxa, maxb));
 			} else if (formulaType == COMBAT_FORMULA_SKILL) {
 				Item* tool = player->getWeapon();
 				const Weapon* weapon = g_weapons->getWeapon(tool);
 				if (weapon) {
-					damage.primary.value = normal_random(
-						static_cast<int32_t>(minb),
-						static_cast<int32_t>(weapon->getWeaponDamage(player, target, tool, true) * maxa + maxb)
-					);
-
+					damage.primary.value = normal_random(minb, std::fma(weapon->getWeaponDamage(player, target, tool, true), maxa, maxb));
 					damage.secondary.type = weapon->getElementType();
 					damage.secondary.value = weapon->getElementDamage(player, target, tool);
-					if (params.useCharges) {
-						uint16_t charges = tool->getCharges();
-						if (charges != 0) {
-							g_game.transformItem(tool, tool->getID(), charges - 1);
-						}
-					}
 				} else {
-					damage.primary.value = normal_random(
-						static_cast<int32_t>(minb),
-						static_cast<int32_t>(maxb)
-					);
+					damage.primary.value = normal_random(minb, maxb);
 				}
 			}
 		}
@@ -184,15 +164,15 @@ bool Combat::isPlayerCombat(const Creature* target)
 	return false;
 }
 
-ReturnValue Combat::canTargetCreature(Player* player, Creature* target)
+ReturnValue Combat::canTargetCreature(Player* attacker, Creature* target)
 {
-	if (player == target) {
+	if (attacker == target) {
 		return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
 	}
 
-	if (!player->hasFlag(PlayerFlag_IgnoreProtectionZone)) {
+	if (!attacker->hasFlag(PlayerFlag_IgnoreProtectionZone)) {
 		//pz-zone
-		if (player->getZone() == ZONE_PROTECTION) {
+		if (attacker->getZone() == ZONE_PROTECTION) {
 			return RETURNVALUE_YOUMAYNOTATTACKAPERSONWHILEINPROTECTIONZONE;
 		}
 
@@ -202,7 +182,7 @@ ReturnValue Combat::canTargetCreature(Player* player, Creature* target)
 
 		//nopvp-zone
 		if (isPlayerCombat(target)) {
-			if (player->getZone() == ZONE_NOPVP) {
+			if (attacker->getZone() == ZONE_NOPVP) {
 				return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
 			}
 
@@ -212,7 +192,7 @@ ReturnValue Combat::canTargetCreature(Player* player, Creature* target)
 		}
 	}
 
-	if (player->hasFlag(PlayerFlag_CannotUseCombat) || !target->isAttackable()) {
+	if (attacker->hasFlag(PlayerFlag_CannotUseCombat) || !target->isAttackable()) {
 		if (target->getPlayer()) {
 			return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
 		} else {
@@ -221,16 +201,16 @@ ReturnValue Combat::canTargetCreature(Player* player, Creature* target)
 	}
 
 	if (target->getPlayer()) {
-		if (isProtected(player, target->getPlayer())) {
+		if (isProtected(attacker, target->getPlayer())) {
 			return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
 		}
 
-		if (player->hasSecureMode() && !Combat::isInPvpZone(player, target) && player->getSkullClient(target->getPlayer()) == SKULL_NONE) {
+		if (attacker->hasSecureMode() && !Combat::isInPvpZone(attacker, target) && attacker->getSkullClient(target->getPlayer()) == SKULL_NONE) {
 			return RETURNVALUE_TURNSECUREMODETOATTACKUNMARKEDPLAYERS;
 		}
 	}
 
-	return Combat::canDoCombat(player, target);
+	return Combat::canDoCombat(attacker, target);
 }
 
 ReturnValue Combat::canDoCombat(Creature* caster, Tile* tile, bool aggressive)
@@ -296,79 +276,81 @@ bool Combat::isProtected(const Player* attacker, const Player* target)
 
 ReturnValue Combat::canDoCombat(Creature* attacker, Creature* target)
 {
-	if (attacker) {
-		if (const Player* targetPlayer = target->getPlayer()) {
-			if (targetPlayer->hasFlag(PlayerFlag_CannotBeAttacked)) {
+	if (!attacker) {
+		return g_events->eventCreatureOnTargetCombat(attacker, target);
+	}
+
+	if (const Player* targetPlayer = target->getPlayer()) {
+		if (targetPlayer->hasFlag(PlayerFlag_CannotBeAttacked)) {
+			return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
+		}
+
+		if (const Player* attackerPlayer = attacker->getPlayer()) {
+			if (attackerPlayer->hasFlag(PlayerFlag_CannotAttackPlayer)) {
 				return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
 			}
 
-			if (const Player* attackerPlayer = attacker->getPlayer()) {
-				if (attackerPlayer->hasFlag(PlayerFlag_CannotAttackPlayer)) {
-					return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
-				}
-
-				if (isProtected(attackerPlayer, targetPlayer)) {
-					return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
-				}
-
-				//nopvp-zone
-				const Tile* targetPlayerTile = targetPlayer->getTile();
-				if (targetPlayerTile->hasFlag(TILESTATE_NOPVPZONE)) {
-					return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
-				} else if (attackerPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE) && !targetPlayerTile->hasFlag(TILESTATE_NOPVPZONE | TILESTATE_PROTECTIONZONE)) {
-					return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
-				}
+			if (isProtected(attackerPlayer, targetPlayer)) {
+				return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
 			}
 
-			if (attacker->isSummon()) {
-				if (const Player* masterAttackerPlayer = attacker->getMaster()->getPlayer()) {
-					if (masterAttackerPlayer->hasFlag(PlayerFlag_CannotAttackPlayer)) {
-						return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
-					}
-
-					if (targetPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE)) {
-						return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
-					}
-
-					if (isProtected(masterAttackerPlayer, targetPlayer)) {
-						return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
-					}
-				}
-			}
-		} else if (target->getMonster()) {
-			if (const Player* attackerPlayer = attacker->getPlayer()) {
-				if (attackerPlayer->hasFlag(PlayerFlag_CannotAttackMonster)) {
-					return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
-				}
-
-				if (target->isSummon() && target->getMaster()->getPlayer() && target->getZone() == ZONE_NOPVP) {
-					return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
-				}
-			} else if (attacker->getMonster()) {
-				const Creature* targetMaster = target->getMaster();
-
-				if (!targetMaster || !targetMaster->getPlayer()) {
-					const Creature* attackerMaster = attacker->getMaster();
-
-					if (!attackerMaster || !attackerMaster->getPlayer()) {
-						return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
-					}
-				}
+			//nopvp-zone
+			const Tile* targetPlayerTile = targetPlayer->getTile();
+			if (targetPlayerTile->hasFlag(TILESTATE_NOPVPZONE)) {
+				return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
+			} else if (attackerPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE) && !targetPlayerTile->hasFlag(TILESTATE_NOPVPZONE | TILESTATE_PROTECTIONZONE)) {
+				return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
 			}
 		}
 
-		if (g_game.getWorldType() == WORLD_TYPE_NO_PVP) {
-			if (attacker->getPlayer() || (attacker->isSummon() && attacker->getMaster()->getPlayer())) {
-				if (target->getPlayer()) {
-					if (!isInPvpZone(attacker, target)) {
-						return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
-					}
+		if (attacker->isSummon()) {
+			if (const Player* masterAttackerPlayer = attacker->getMaster()->getPlayer()) {
+				if (masterAttackerPlayer->hasFlag(PlayerFlag_CannotAttackPlayer)) {
+					return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
 				}
 
-				if (target->isSummon() && target->getMaster()->getPlayer()) {
-					if (!isInPvpZone(attacker, target)) {
-						return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
-					}
+				if (targetPlayer->getTile()->hasFlag(TILESTATE_NOPVPZONE)) {
+					return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
+				}
+
+				if (isProtected(masterAttackerPlayer, targetPlayer)) {
+					return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
+				}
+			}
+		}
+	} else if (target->getMonster()) {
+		if (const Player* attackerPlayer = attacker->getPlayer()) {
+			if (attackerPlayer->hasFlag(PlayerFlag_CannotAttackMonster)) {
+				return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
+			}
+
+			if (target->isSummon() && target->getMaster()->getPlayer() && target->getZone() == ZONE_NOPVP) {
+				return RETURNVALUE_ACTIONNOTPERMITTEDINANOPVPZONE;
+			}
+		} else if (attacker->getMonster()) {
+			const Creature* targetMaster = target->getMaster();
+
+			if (!targetMaster || !targetMaster->getPlayer()) {
+				const Creature* attackerMaster = attacker->getMaster();
+
+				if (!attackerMaster || !attackerMaster->getPlayer()) {
+					return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
+				}
+			}
+		}
+	}
+
+	if (g_game.getWorldType() == WORLD_TYPE_NO_PVP) {
+		if (attacker->getPlayer() || (attacker->isSummon() && attacker->getMaster()->getPlayer())) {
+			if (target->getPlayer()) {
+				if (!isInPvpZone(attacker, target)) {
+					return RETURNVALUE_YOUMAYNOTATTACKTHISPLAYER;
+				}
+			}
+
+			if (target->isSummon() && target->getMaster()->getPlayer()) {
+				if (!isInPvpZone(attacker, target)) {
+					return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
 				}
 			}
 		}
@@ -376,13 +358,13 @@ ReturnValue Combat::canDoCombat(Creature* attacker, Creature* target)
 	return g_events->eventCreatureOnTargetCombat(attacker, target);
 }
 
-void Combat::setPlayerCombatValues(formulaType_t newFormulaType, double newMina, double newMinb, double newMaxa, double newMaxb)
+void Combat::setPlayerCombatValues(formulaType_t formulaType, double mina, double minb, double maxa, double maxb)
 {
-	this->formulaType = newFormulaType;
-	this->mina = newMina;
-	this->minb = newMinb;
-	this->maxa = newMaxa;
-	this->maxb = newMaxb;
+	this->formulaType = formulaType;
+	this->mina = mina;
+	this->minb = minb;
+	this->maxa = maxa;
+	this->maxb = maxb;
 }
 
 bool Combat::setParam(CombatParam_t param, uint32_t value)
@@ -486,104 +468,7 @@ CallBack* Combat::getCallback(CallBackParam_t key)
 	return nullptr;
 }
 
-void Combat::CombatHealthFunc(Creature* caster, Creature* target, const CombatParams& params, CombatDamage* data)
-{
-	assert(data);
-	CombatDamage damage = *data;
-	if (caster && caster->getPlayer()) {
-		Item* tool = caster->getPlayer()->getWeapon();
-		g_events->eventPlayerOnCombat(caster->getPlayer(), target, tool, damage);
-	}
-
-	if (g_game.combatBlockHit(damage, caster, target, params.blockedByShield, params.blockedByArmor, params.itemId != 0)) {
-		return;
-	}
-
-	if ((damage.primary.value < 0 || damage.secondary.value < 0)) {
-		if (caster && caster->getPlayer() && target->getSkull() != SKULL_BLACK && target->getPlayer()) {
-			damage.primary.value /= 2;
-			damage.secondary.value /= 2;
-		}
-	}
-
-	if (g_game.combatChangeHealth(caster, target, damage)) {
-		CombatConditionFunc(caster, target, params, &damage);
-		CombatDispelFunc(caster, target, params, nullptr);
-	}
-}
-
-void Combat::CombatManaFunc(Creature* caster, Creature* target, const CombatParams& params, CombatDamage* data)
-{
-	assert(data);
-	CombatDamage damage = *data;
-	if (damage.primary.value < 0) {
-		if (caster && caster->getPlayer() && target->getSkull() != SKULL_BLACK && target->getPlayer()) {
-			damage.primary.value /= 2;
-		}
-	}
-	if (g_game.combatChangeMana(caster, target, damage)) {
-		CombatConditionFunc(caster, target, params, nullptr);
-		CombatDispelFunc(caster, target, params, nullptr);
-	}
-}
-
-void Combat::CombatConditionFunc(Creature* caster, Creature* target, const CombatParams& params, CombatDamage* data)
-{
-	if (params.origin == ORIGIN_MELEE && data && data->primary.value == 0 && data->secondary.value == 0) {
-		return;
-	}
-
-	for (const auto& condition : params.conditionList) {
-		//Cleanse charm rune (target as player)
-		Player* player = target->getPlayer();
-		if (player) {
-			if (player->isImmuneCleanse(condition->getType())) {
-				player->sendCancelMessage("You are still immune against this spell.");
-				return;
-			} else if (caster->getMonster()) {
-				uint16_t playerCharmRaceid = player->parseRacebyCharm(CHARM_CLEANSE, false, 0);
-				if (playerCharmRaceid != 0) {
-					MonsterType* mType = g_monsters.getMonsterType(caster->getName());
-					if (mType && playerCharmRaceid == mType->info.raceid) {
-						IOBestiary g_bestiary;
-						Charm* charm = g_bestiary.getBestiaryCharm(CHARM_CLEANSE);
-						if (charm && (charm->chance > normal_random(0, 100))) {
-							if (player->hasCondition(condition->getType())) {
-								player->removeCondition(condition->getType());
-							}
-							player->setImmuneCleanse(condition->getType());
-							player->sendCancelMessage(charm->cancelMsg);
-							return;
-						}
-					}
-				}
-			}
-		}
-
-		if (caster == target || !target->isImmune(condition->getType())) {
-			Condition* conditionCopy = condition->clone();
-			if (caster) {
-				conditionCopy->setParam(CONDITION_PARAM_OWNER, caster->getID());
-			}
-
-			//TODO: infight condition until all aggressive conditions has ended
-			target->addCombatCondition(conditionCopy);
-		}
-	}
-}
-
-void Combat::CombatDispelFunc(Creature*, Creature* target, const CombatParams& params, CombatDamage*)
-{
-	target->removeCombatCondition(params.dispelType);
-}
-
-void Combat::CombatNullFunc(Creature* caster, Creature* target, const CombatParams& params, CombatDamage*)
-{
-	CombatConditionFunc(caster, target, params, nullptr);
-	CombatDispelFunc(caster, target, params, nullptr);
-}
-
-void Combat::combatTileEffects(const SpectatorHashSet& spectators, Creature* caster, Tile* tile, const CombatParams& params)
+void Combat::combatTileEffects(const SpectatorVec& spectators, Creature* caster, Tile* tile, const CombatParams& params)
 {
 	if (params.itemId != 0) {
 		uint16_t itemId = params.itemId;
@@ -637,11 +522,11 @@ void Combat::combatTileEffects(const SpectatorHashSet& spectators, Creature* cas
 					} else if (itemId == ITEM_ENERGYFIELD_PVP) {
 						itemId = ITEM_ENERGYFIELD_NOPVP;
 					} else if (itemId == ITEM_MAGICWALL) {
-						itemId = ITEM_MAGICWALL_SAFE;
+						itemId = ITEM_MAGICWALL_NOPVP;
 					} else if (itemId == ITEM_WILDGROWTH) {
-						itemId = ITEM_WILDGROWTH_SAFE;
-					}	
-				} else if (itemId == ITEM_FIREFIELD_PVP_FULL || itemId == ITEM_POISONFIELD_PVP || itemId == ITEM_ENERGYFIELD_PVP || itemId == ITEM_MAGICWALL || itemId == ITEM_WILDGROWTH) {
+						itemId = ITEM_WILDGROWTH_NOPVP;
+					}
+				} else if (itemId == ITEM_FIREFIELD_PVP_FULL || itemId == ITEM_POISONFIELD_PVP || itemId == ITEM_ENERGYFIELD_PVP) {
 					casterPlayer->addInFightTicks();
 				}
 			}
@@ -714,13 +599,52 @@ void Combat::doCombat(Creature* caster, Creature* target) const
 	//target combat callback function
 	if (params.combatType != COMBAT_NONE) {
 		CombatDamage damage = getCombatDamage(caster, target);
-		if (damage.primary.type != COMBAT_MANADRAIN) {
-			doCombatHealth(caster, target, damage, params);
-		} else {
-			doCombatMana(caster, target, damage, params);
+
+		bool canCombat = !params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR);
+		if ((caster == target || canCombat) && params.impactEffect != CONST_ME_NONE) {
+			g_game.addMagicEffect(target->getPosition(), params.impactEffect);
+		}
+
+		if (canCombat) {
+			doTargetCombat(caster, target, damage, params);
 		}
 	} else {
-		doCombatDefault(caster, target, params);
+		if (!params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR)) {
+			SpectatorVec spectators;
+			g_game.map.getSpectators(spectators, target->getPosition(), true, true);
+
+			if (params.origin != ORIGIN_MELEE) {
+				for (const auto& condition : params.conditionList) {
+					if (caster == target || !target->isImmune(condition->getType())) {
+						Condition* conditionCopy = condition->clone();
+						conditionCopy->setParam(CONDITION_PARAM_OWNER, caster->getID());
+						target->addCombatCondition(conditionCopy);
+					}
+				}
+			}
+
+			if (params.dispelType == CONDITION_PARALYZE) {
+				target->removeCondition(CONDITION_PARALYZE);
+			} else {
+				target->removeCombatCondition(params.dispelType);
+			}
+
+			combatTileEffects(spectators, caster, target->getTile(), params);
+
+			if (params.targetCallback) {
+				params.targetCallback->onTargetCombat(caster, target);
+			}
+
+			/*
+			if (params.impactEffect != CONST_ME_NONE) {
+				g_game.addMagicEffect(target->getPosition(), params.impactEffect);
+			}
+			*/
+
+			if (caster && params.distanceEffect != CONST_ANI_NONE) {
+				addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
+			}
+		}
 	}
 }
 
@@ -729,105 +653,81 @@ void Combat::doCombat(Creature* caster, const Position& position) const
 	//area combat callback function
 	if (params.combatType != COMBAT_NONE) {
 		CombatDamage damage = getCombatDamage(caster, nullptr);
-		if (damage.primary.type != COMBAT_MANADRAIN) {
-			doCombatHealth(caster, position, area.get(), damage, params);
+		doAreaCombat(caster, position, area.get(), damage, params);
+	} else {
+		std::forward_list<Tile*> tileList;
+
+		if (caster) {
+			getCombatArea(caster->getPosition(), position, area.get(), tileList);
 		} else {
-			doCombatMana(caster, position, area.get(), damage, params);
-		}
-	} else {
-		CombatFunc(caster, position, area.get(), params, CombatNullFunc, nullptr);
-	}
-}
-
-void Combat::CombatFunc(Creature* caster, const Position& pos, const AreaCombat* area, const CombatParams& params, CombatFunction func, CombatDamage* data)
-{
-	std::forward_list<Tile*> tileList;
-
-	if (caster) {
-		getCombatArea(caster->getPosition(), pos, area, tileList);
-	} else {
-		getCombatArea(pos, pos, area, tileList);
-	}
-
-	SpectatorHashSet spectators;
-	uint32_t maxX = 0;
-	uint32_t maxY = 0;
-
-	//calculate the max viewable range
-	for (Tile* tile : tileList) {
-		const Position& tilePos = tile->getPosition();
-
-		uint32_t diff = Position::getDistanceX(tilePos, pos);
-		if (diff > maxX) {
-			maxX = diff;
+			getCombatArea(position, position, area.get(), tileList);
 		}
 
-		diff = Position::getDistanceY(tilePos, pos);
-		if (diff > maxY) {
-			maxY = diff;
-		}
-	}
+		SpectatorVec spectators;
+		uint32_t maxX = 0;
+		uint32_t maxY = 0;
 
-	const int32_t rangeX = maxX + Map::maxViewportX;
-	const int32_t rangeY = maxY + Map::maxViewportY;
-	g_game.map.getSpectators(spectators, pos, true, true, rangeX, rangeX, rangeY, rangeY);
+		//calculate the max viewable range
+		for (Tile* tile : tileList) {
+			const Position& tilePos = tile->getPosition();
 
-	int affected = 0;
-	for (Tile* tile : tileList) {
-		if (canDoCombat(caster, tile, params.aggressive) != RETURNVALUE_NOERROR) {
-			continue;
-		}
+			uint32_t diff = Position::getDistanceX(tilePos, position);
+			if (diff > maxX) {
+				maxX = diff;
+			}
 
-		if (CreatureVector* creatures = tile->getCreatures()) {
-			const Creature* topCreature = tile->getTopCreature();
-			for (Creature* creature : *creatures) {
-				if (params.targetCasterOrTopMost) {
-					if (caster && caster->getTile() == tile) {
-						if (creature != caster) {
-							continue;
-						}
-					} else if (creature != topCreature) {
-						continue;
-					}
-				}
-
-				if (!params.aggressive || (caster != creature && Combat::canDoCombat(caster, creature) == RETURNVALUE_NOERROR)) {
-					affected++;
-				}
+			diff = Position::getDistanceY(tilePos, position);
+			if (diff > maxY) {
+				maxY = diff;
 			}
 		}
-	}
-	//
-	CombatDamage tmpDamage;
-    if(data) {
-        tmpDamage.origin = data->origin;
-        tmpDamage.primary.type = data->primary.type;
-        tmpDamage.primary.value = data->primary.value;        
-        tmpDamage.secondary.type = data->secondary.type;
-        tmpDamage.secondary.value = data->secondary.value;
-        tmpDamage.critical = data->critical;
-    }
-	tmpDamage.affected = affected;
-	for (Tile* tile : tileList) {
-		if (canDoCombat(caster, tile, params.aggressive) != RETURNVALUE_NOERROR) {
-			continue;
-		}
 
-		if (CreatureVector* creatures = tile->getCreatures()) {
-			const Creature* topCreature = tile->getTopCreature();
-			for (Creature* creature : *creatures) {
-				if (params.targetCasterOrTopMost) {
-					if (caster && caster->getTile() == tile) {
-						if (creature != caster) {
+		const int32_t rangeX = maxX + Map::maxViewportX;
+		const int32_t rangeY = maxY + Map::maxViewportY;
+		g_game.map.getSpectators(spectators, position, true, true, rangeX, rangeX, rangeY, rangeY);
+
+		postCombatEffects(caster, position, params);
+
+		for (Tile* tile : tileList) {
+			if (canDoCombat(caster, tile, params.aggressive) != RETURNVALUE_NOERROR) {
+				continue;
+			}
+
+			combatTileEffects(spectators, caster, tile, params);
+
+			if (CreatureVector* creatures = tile->getCreatures()) {
+				const Creature* topCreature = tile->getTopCreature();
+				for (Creature* creature : *creatures) {
+					if (params.targetCasterOrTopMost) {
+						if (caster && caster->getTile() == tile) {
+							if (creature != caster) {
+								continue;
+							}
+						} else if (creature != topCreature) {
 							continue;
 						}
-					} else if (creature != topCreature) {
-						continue;
 					}
-				}
 
-				if (!params.aggressive || (caster != creature && Combat::canDoCombat(caster, creature) == RETURNVALUE_NOERROR)) {
-					func(caster, creature, params, &tmpDamage);
+					if (!params.aggressive || (caster != creature && Combat::canDoCombat(caster, creature) == RETURNVALUE_NOERROR)) {
+						for (const auto& condition : params.conditionList) {
+							if (caster == creature || !creature->isImmune(condition->getType())) {
+								Condition* conditionCopy = condition->clone();
+								if (caster) {
+									conditionCopy->setParam(CONDITION_PARAM_OWNER, caster->getID());
+								}
+
+								//TODO: infight condition until all aggressive conditions has ended
+								creature->addCombatCondition(conditionCopy);
+							}
+						}
+					}
+
+					if (params.dispelType == CONDITION_PARALYZE) {
+						creature->removeCondition(CONDITION_PARALYZE);
+					} else {
+						creature->removeCombatCondition(params.dispelType);
+					}
+
 					if (params.targetCallback) {
 						params.targetCallback->onTargetCombat(caster, creature);
 					}
@@ -838,196 +738,286 @@ void Combat::CombatFunc(Creature* caster, const Position& pos, const AreaCombat*
 				}
 			}
 		}
-		combatTileEffects(spectators, caster, tile, params);
 	}
-
-	postCombatEffects(caster, pos, params);
 }
 
-void Combat::doCombatHealth(Creature* caster, Creature* target, CombatDamage& damage, const CombatParams& params)
+void Combat::doTargetCombat(Creature* caster, Creature* target, CombatDamage& damage, const CombatParams& params)
 {
-	bool canCombat = !params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR);
-	if ((caster == target || canCombat) && params.impactEffect != CONST_ME_NONE) {
-		g_game.addMagicEffect(target->getPosition(), params.impactEffect);
+	if (caster && target && params.distanceEffect != CONST_ANI_NONE) {
+		addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
 	}
 
-	if(caster && caster->getPlayer()){
-		// Critical damage
-		uint16_t chance = caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_CHANCE);
-		// Charm low blow rune)
-		if (target && target->getMonster()) {
-			uint16_t playerCharmRaceid = caster->getPlayer()->parseRacebyCharm(CHARM_LOW, false, 0);
-			if (playerCharmRaceid != 0) {
-				MonsterType* mType = g_monsters.getMonsterType(target->getName());
-				if (mType && playerCharmRaceid == mType->info.raceid) {
-					IOBestiary g_bestiary;
-					Charm* charm = g_bestiary.getBestiaryCharm(CHARM_LOW);
-					if (charm) {
-						chance += charm->percent;
+	Player* casterPlayer = caster ? caster->getPlayer() : nullptr;
+
+	bool success = false;
+	if (damage.primary.type != COMBAT_MANADRAIN) {
+		if (g_game.combatBlockHit(damage, caster, target, params.blockedByShield, params.blockedByArmor, params.itemId != 0)) {
+			return;
+		}
+
+		if (casterPlayer) {
+			Player* targetPlayer = target ? target->getPlayer() : nullptr;
+			if (targetPlayer && targetPlayer->getSkull() != SKULL_BLACK) {
+				damage.primary.value /= 2;
+				damage.secondary.value /= 2;
+			}
+
+			if (!damage.critical && damage.origin != ORIGIN_CONDITION) {
+				uint16_t chance = casterPlayer->getSpecialSkill(SPECIALSKILL_CRITICALHITCHANCE);
+				uint16_t skill = casterPlayer->getSpecialSkill(SPECIALSKILL_CRITICALHITAMOUNT);
+				if (chance > 0 && skill > 0 && normal_random(1, 100) <= chance) {
+					damage.primary.value += std::round(damage.primary.value * (skill / 100.));
+					damage.secondary.value += std::round(damage.secondary.value * (skill / 100.));
+					damage.critical = true;
+				}
+			}
+		}
+
+		success = g_game.combatChangeHealth(caster, target, damage);
+	} else {
+		success = g_game.combatChangeMana(caster, target, damage);
+	}
+
+	if (success) {
+		if (damage.blockType == BLOCK_NONE || damage.blockType == BLOCK_ARMOR) {
+			for (const auto& condition : params.conditionList) {
+				if (caster == target || !target->isImmune(condition->getType())) {
+					Condition* conditionCopy = condition->clone();
+					if (caster) {
+						conditionCopy->setParam(CONDITION_PARAM_OWNER, caster->getID());
+					}
+
+					//TODO: infight condition until all aggressive conditions has ended
+					target->addCombatCondition(conditionCopy);
+				}
+			}
+		}
+
+		if (damage.critical) {
+			g_game.addMagicEffect(target->getPosition(), CONST_ME_CRITICAL_DAMAGE);
+		}
+
+		if (casterPlayer && damage.origin != ORIGIN_CONDITION) {
+			if (!damage.leeched) {
+				CombatDamage leechCombat;
+				leechCombat.origin = ORIGIN_NONE;
+				leechCombat.leeched = true;
+
+				int32_t totalDamage = std::abs(damage.primary.value + damage.secondary.value);
+
+				if (casterPlayer->getHealth() < casterPlayer->getMaxHealth()) {
+					uint16_t chance = casterPlayer->getSpecialSkill(SPECIALSKILL_LIFELEECHCHANCE);
+					uint16_t skill = casterPlayer->getSpecialSkill(SPECIALSKILL_LIFELEECHAMOUNT);
+					if (chance > 0 && skill > 0 && normal_random(1, 100) <= chance) {
+						leechCombat.primary.value = std::round(totalDamage * (skill / 100.));
+						g_game.combatChangeHealth(nullptr, casterPlayer, leechCombat);
+						casterPlayer->sendMagicEffect(casterPlayer->getPosition(), CONST_ME_MAGIC_RED);
+					}
+				}
+
+				if (casterPlayer->getMana() < casterPlayer->getMaxMana()) {
+					uint16_t chance = casterPlayer->getSpecialSkill(SPECIALSKILL_MANALEECHCHANCE);
+					uint16_t skill = casterPlayer->getSpecialSkill(SPECIALSKILL_MANALEECHAMOUNT);
+					if (chance > 0 && skill > 0 && normal_random(1, 100) <= chance) {
+						leechCombat.primary.value = std::round(totalDamage * (skill / 100.));
+						g_game.combatChangeMana(nullptr, casterPlayer, leechCombat);
+						casterPlayer->sendMagicEffect(casterPlayer->getPosition(), CONST_ME_MAGIC_BLUE);
 					}
 				}
 			}
 		}
-		if (damage.primary.type != COMBAT_HEALING && chance != 0 && uniform_random(1, 100) <= chance) {
-			damage.critical = true;
-			damage.primary.value += (damage.primary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
-			damage.secondary.value += (damage.secondary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
+
+		if (params.dispelType == CONDITION_PARALYZE) {
+			target->removeCondition(CONDITION_PARALYZE);
+		} else {
+			target->removeCombatCondition(params.dispelType);
 		}
 	}
-	if (canCombat) {
-		if (caster && params.distanceEffect != CONST_ANI_NONE) {
-			addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
-		}
 
-		CombatHealthFunc(caster, target, params, &damage);
-		if (params.targetCallback) {
-			params.targetCallback->onTargetCombat(caster, target);
-		}
+	if (params.targetCallback) {
+		params.targetCallback->onTargetCombat(caster, target);
 	}
 }
 
-void Combat::doCombatHealth(Creature* caster, const Position& position, const AreaCombat* area, CombatDamage& damage, const CombatParams& params)
+void Combat::doAreaCombat(Creature* caster, const Position& position, const AreaCombat* area, CombatDamage& damage, const CombatParams& params)
 {
-		if(caster && caster->getPlayer()){
-			// Critical damage
-			uint16_t chance = caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_CHANCE);
-			if (damage.primary.type != COMBAT_HEALING && chance != 0 && uniform_random(1, 100) <= chance) {
-				damage.critical = true;
-				damage.primary.value += (damage.primary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
-				damage.secondary.value += (damage.secondary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
+	std::forward_list<Tile*> tileList;
+
+	if (caster) {
+		getCombatArea(caster->getPosition(), position, area, tileList);
+	} else {
+		getCombatArea(position, position, area, tileList);
+	}
+
+	Player* casterPlayer = caster ? caster->getPlayer() : nullptr;
+	int32_t criticalPrimary = 0;
+	int32_t criticalSecondary = 0;
+	if (casterPlayer && !damage.critical && damage.origin != ORIGIN_CONDITION && (damage.primary.value < 0 || damage.secondary.value < 0)) {
+		uint16_t chance = casterPlayer->getSpecialSkill(SPECIALSKILL_CRITICALHITCHANCE);
+		uint16_t skill = casterPlayer->getSpecialSkill(SPECIALSKILL_CRITICALHITAMOUNT);
+		if (chance > 0 && skill > 0 && uniform_random(1, 100) <= chance) {
+			criticalPrimary = std::round(damage.primary.value * (skill / 100.));
+			criticalSecondary = std::round(damage.secondary.value * (skill / 100.));
+			damage.critical = true;
+		}
+	}
+
+	uint32_t maxX = 0;
+	uint32_t maxY = 0;
+
+	//calculate the max viewable range
+	for (Tile* tile : tileList) {
+		const Position& tilePos = tile->getPosition();
+
+		uint32_t diff = Position::getDistanceX(tilePos, position);
+		if (diff > maxX) {
+			maxX = diff;
+		}
+
+		diff = Position::getDistanceY(tilePos, position);
+		if (diff > maxY) {
+			maxY = diff;
+		}
+	}
+
+	const int32_t rangeX = maxX + Map::maxViewportX;
+	const int32_t rangeY = maxY + Map::maxViewportY;
+
+	SpectatorVec spectators;
+	g_game.map.getSpectators(spectators, position, true, true, rangeX, rangeX, rangeY, rangeY);
+
+	postCombatEffects(caster, position, params);
+
+	std::vector<Creature*> toDamageCreatures;
+	toDamageCreatures.reserve(100);
+
+	for (Tile* tile : tileList) {
+		if (canDoCombat(caster, tile, params.aggressive) != RETURNVALUE_NOERROR) {
+			continue;
+		}
+
+		combatTileEffects(spectators, caster, tile, params);
+
+		if (CreatureVector* creatures = tile->getCreatures()) {
+			const Creature* topCreature = tile->getTopCreature();
+			for (Creature* creature : *creatures) {
+				if (params.targetCasterOrTopMost) {
+					if (caster && caster->getTile() == tile) {
+						if (creature != caster) {
+							continue;
+						}
+					} else if (creature != topCreature) {
+						continue;
+					}
+				}
+
+				if (!params.aggressive || (caster != creature && Combat::canDoCombat(caster, creature) == RETURNVALUE_NOERROR)) {
+					toDamageCreatures.push_back(creature);
+
+					if (params.targetCasterOrTopMost) {
+						break;
+					}
+				}
 			}
 		}
-	CombatFunc(caster, position, area, params, CombatHealthFunc, &damage);
-}
-
-void Combat::doCombatMana(Creature* caster, Creature* target, CombatDamage& damage, const CombatParams& params)
-{
-	bool canCombat = !params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR);
-	if ((caster == target || canCombat) && params.impactEffect != CONST_ME_NONE) {
-		g_game.addMagicEffect(target->getPosition(), params.impactEffect);
 	}
 
-	if(caster && caster->getPlayer()){
-		// Critical damage
-		uint16_t chance = caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_CHANCE);
-		if (chance != 0 && uniform_random(1, 100) <= chance) {
-			damage.critical = true;
-			damage.primary.value += (damage.primary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
-			damage.secondary.value += (damage.secondary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
-		}
-	}
-	if (canCombat) {
-		if (caster && params.distanceEffect != CONST_ANI_NONE) {
-			addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
-		}
+	CombatDamage leechCombat;
+	leechCombat.origin = ORIGIN_NONE;
+	leechCombat.leeched = true;
 
-		CombatManaFunc(caster, target, params, &damage);
-		if (params.targetCallback) {
-			params.targetCallback->onTargetCombat(caster, target);
-		}
-	}
-}
-
-void Combat::doCombatMana(Creature* caster, const Position& position, const AreaCombat* area, CombatDamage& damage, const CombatParams& params)
-{
-	if(caster && caster->getPlayer()){
-			// Critical damage
-			uint16_t chance = caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_CHANCE);
-			if (chance != 0 && uniform_random(1, 100) <= chance) {
-				damage.critical = true;
-				damage.primary.value += (damage.primary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
-				damage.secondary.value += (damage.secondary.value * caster->getPlayer()->getSkillLevel(SKILL_CRITICAL_HIT_DAMAGE ))/100;
+	for (Creature* creature : toDamageCreatures) {
+		CombatDamage damageCopy = damage; // we cannot avoid copying here, because we don't know if it's player combat or not, so we can't modify the initial damage.
+		bool playerCombatReduced = false;
+		if ((damageCopy.primary.value < 0 || damageCopy.secondary.value < 0) && caster) {
+			Player* targetPlayer = creature->getPlayer();
+			if (casterPlayer) {
+				if (targetPlayer && targetPlayer->getSkull() != SKULL_BLACK) {
+					damageCopy.primary.value /= 2;
+					damageCopy.secondary.value /= 2;
+					playerCombatReduced = true;
+				}
 			}
 		}
-	CombatFunc(caster, position, area, params, CombatManaFunc, &damage);
-}
 
-void Combat::doCombatCondition(Creature* caster, const Position& position, const AreaCombat* area, const CombatParams& params)
-{
-	CombatFunc(caster, position, area, params, CombatConditionFunc, nullptr);
-}
+		damageCopy.primary.value += playerCombatReduced ? criticalPrimary / 2 : criticalPrimary;
+		damageCopy.secondary.value += playerCombatReduced ? criticalSecondary / 2 : criticalSecondary;
 
-void Combat::doCombatCondition(Creature* caster, Creature* target, const CombatParams& params)
-{
-	bool canCombat = !params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR);
-	if ((caster == target || canCombat) && params.impactEffect != CONST_ME_NONE) {
-		g_game.addMagicEffect(target->getPosition(), params.impactEffect);
-	}
-
-	if (canCombat) {
-		if (caster && params.distanceEffect != CONST_ANI_NONE) {
-			addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
+		if (damageCopy.critical) {
+			g_game.addMagicEffect(creature->getPosition(), CONST_ME_CRITICAL_DAMAGE);
 		}
 
-		CombatConditionFunc(caster, target, params, nullptr);
+		bool success = false;
+		if (damageCopy.primary.type != COMBAT_MANADRAIN) {
+			if (g_game.combatBlockHit(damageCopy, caster, creature, params.blockedByShield, params.blockedByArmor, params.itemId != 0)) {
+				continue;
+			}
+			success = g_game.combatChangeHealth(caster, creature, damageCopy);
+		} else {
+			success = g_game.combatChangeMana(caster, creature, damageCopy);
+		}
+
+		if (success) {
+			if (damage.blockType == BLOCK_NONE || damage.blockType == BLOCK_ARMOR) {
+				for (const auto& condition : params.conditionList) {
+					if (caster == creature || !creature->isImmune(condition->getType())) {
+						Condition* conditionCopy = condition->clone();
+						if (caster) {
+							conditionCopy->setParam(CONDITION_PARAM_OWNER, caster->getID());
+						}
+
+						//TODO: infight condition until all aggressive conditions has ended
+						creature->addCombatCondition(conditionCopy);
+					}
+				}
+			}
+
+			int32_t totalDamage = std::abs(damageCopy.primary.value + damageCopy.secondary.value);
+
+			if (casterPlayer && !damage.leeched && damage.origin != ORIGIN_CONDITION) {
+				int32_t targetsCount = toDamageCreatures.size();
+
+				if (casterPlayer->getHealth() < casterPlayer->getMaxHealth()) {
+					uint16_t chance = casterPlayer->getSpecialSkill(SPECIALSKILL_LIFELEECHCHANCE);
+					uint16_t skill = casterPlayer->getSpecialSkill(SPECIALSKILL_LIFELEECHAMOUNT);
+					if (chance > 0 && skill > 0 && normal_random(1, 100) <= chance) {
+						leechCombat.primary.value = std::ceil(totalDamage * ((skill / 100.) + ((targetsCount - 1) * ((skill / 100.) / 10.))) / targetsCount);
+						g_game.combatChangeHealth(nullptr, casterPlayer, leechCombat);
+						casterPlayer->sendMagicEffect(casterPlayer->getPosition(), CONST_ME_MAGIC_RED);
+					}
+				}
+
+				if (casterPlayer->getMana() < casterPlayer->getMaxMana()) {
+					uint16_t chance = casterPlayer->getSpecialSkill(SPECIALSKILL_MANALEECHCHANCE);
+					uint16_t skill = casterPlayer->getSpecialSkill(SPECIALSKILL_MANALEECHAMOUNT);
+					if (chance > 0 && skill > 0 && normal_random(1, 100) <= chance) {
+						leechCombat.primary.value = std::ceil(totalDamage * ((skill / 100.) + ((targetsCount - 1) * ((skill / 100.) / 10.))) / targetsCount);
+						g_game.combatChangeMana(nullptr, casterPlayer, leechCombat);
+						casterPlayer->sendMagicEffect(casterPlayer->getPosition(), CONST_ME_MAGIC_BLUE);
+					}
+				}
+			}
+
+			if (params.dispelType == CONDITION_PARALYZE) {
+				creature->removeCondition(CONDITION_PARALYZE);
+			} else {
+				creature->removeCombatCondition(params.dispelType);
+			}
+		}
+
 		if (params.targetCallback) {
-			params.targetCallback->onTargetCombat(caster, target);
-		}
-	}
-}
-
-void Combat::doCombatDispel(Creature* caster, const Position& position, const AreaCombat* area, const CombatParams& params)
-{
-	CombatFunc(caster, position, area, params, CombatDispelFunc, nullptr);
-}
-
-void Combat::doCombatDispel(Creature* caster, Creature* target, const CombatParams& params)
-{
-	bool canCombat = !params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR);
-	if ((caster == target || canCombat) && params.impactEffect != CONST_ME_NONE) {
-		g_game.addMagicEffect(target->getPosition(), params.impactEffect);
-	}
-
-	if (canCombat) {
-		CombatDispelFunc(caster, target, params, nullptr);
-		if (params.targetCallback) {
-			params.targetCallback->onTargetCombat(caster, target);
-		}
-
-		if (caster && params.distanceEffect != CONST_ANI_NONE) {
-			addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
-		}
-	}
-}
-
-void Combat::doCombatDefault(Creature* caster, Creature* target, const CombatParams& params)
-{
-	if (!params.aggressive || (caster != target && Combat::canDoCombat(caster, target) == RETURNVALUE_NOERROR)) {
-		SpectatorHashSet spectators;
-		g_game.map.getSpectators(spectators, target->getPosition(), true, true);
-
-		CombatNullFunc(caster, target, params, nullptr);
-		combatTileEffects(spectators, caster, target->getTile(), params);
-
-		if (params.targetCallback) {
-			params.targetCallback->onTargetCombat(caster, target);
-		}
-
-		/*
-		if (params.impactEffect != CONST_ME_NONE) {
-			g_game.addMagicEffect(target->getPosition(), params.impactEffect);
-		}
-		*/
-
-		if (caster && params.distanceEffect != CONST_ANI_NONE) {
-			addDistanceEffect(caster, caster->getPosition(), target->getPosition(), params.distanceEffect);
+			params.targetCallback->onTargetCombat(caster, creature);
 		}
 	}
 }
 
 //**********************************************************//
 
-void ValueCallback::getMinMaxValues(Player* player, CombatDamage& damage, bool useCharges) const
+void ValueCallback::getMinMaxValues(Player* player, CombatDamage& damage) const
 {
 	//onGetPlayerMinMaxValues(...)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - ValueCallback::getMinMaxValues"
-				<< " Player "
-				<< player->getName()
-				<< " Formula "
-				<< type
-				<< "] Call stack overflow. Too many lua script calls being nested."
-				<< std::endl;
+		std::cout << "[Error - ValueCallback::getMinMaxValues] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1044,11 +1034,7 @@ void ValueCallback::getMinMaxValues(Player* player, CombatDamage& damage, bool u
 	LuaScriptInterface::pushUserdata<Player>(L, player);
 	LuaScriptInterface::setMetatable(L, -1, "Player");
 
-	int16_t elementAttack = 0; // To calculate elemental damage after executing spell script and get real damage.
-	int32_t attackValue = 7; // default start attack value
 	int parameters = 1;
-	bool shouldCalculateSecondaryDamage = false;
-
 	switch (type) {
 		case COMBAT_FORMULA_LEVELMAGIC: {
 			//onGetPlayerMinMaxValues(player, level, maglevel)
@@ -1064,6 +1050,7 @@ void ValueCallback::getMinMaxValues(Player* player, CombatDamage& damage, bool u
 			const Weapon* weapon = g_weapons->getWeapon(tool);
 			Item* item = nullptr;
 
+			int32_t attackValue = 7;
 			if (weapon) {
 				attackValue = tool->getAttack();
 				if (tool->getWeaponType() == WEAPON_AMMO) {
@@ -1073,26 +1060,8 @@ void ValueCallback::getMinMaxValues(Player* player, CombatDamage& damage, bool u
 					}
 				}
 
-				CombatType_t elementType = weapon->getElementType();
-				damage.secondary.type = elementType;
-
-				if (elementType != COMBAT_NONE) {
-					if (weapon) {
-						elementAttack = weapon->getElementDamageValue();
-						shouldCalculateSecondaryDamage = true;
-						attackValue += elementAttack;
-					}
-				}
-				else {
-					shouldCalculateSecondaryDamage = false;
-				}
-		
-				if (useCharges) {
-					uint16_t charges = tool->getCharges();
-					if (charges != 0) {
-						g_game.transformItem(tool, tool->getID(), charges - 1);
-					}
-				}
+				damage.secondary.type = weapon->getElementType();
+				damage.secondary.value = weapon->getElementDamage(player, nullptr, tool);
 			}
 
 			lua_pushnumber(L, player->getWeaponSkill(item ? item : tool));
@@ -1112,27 +1081,11 @@ void ValueCallback::getMinMaxValues(Player* player, CombatDamage& damage, bool u
 	int size0 = lua_gettop(L);
 	if (lua_pcall(L, parameters, 2, 0) != 0) {
 		LuaScriptInterface::reportError(nullptr, LuaScriptInterface::popString(L));
-	}
-	else {
-
-		int32_t defaultDmg = normal_random(
+	} else {
+		damage.primary.value = normal_random(
 			LuaScriptInterface::getNumber<int32_t>(L, -2),
 			LuaScriptInterface::getNumber<int32_t>(L, -1)
 		);
-
-		if (shouldCalculateSecondaryDamage) {
-			double factor = (double)elementAttack / (double)attackValue; //attack value here is phys dmg + element dmg
-			int32_t elementDamage = std::round(defaultDmg * factor);
-			int32_t physDmg = std::round(defaultDmg * (1.0 - factor));
-			damage.primary.value = physDmg;
-			damage.secondary.value = elementDamage;
-
-		} else {
-			damage.primary.value = defaultDmg;
-			damage.secondary.type = COMBAT_NONE;
-			damage.secondary.value = 0;
-		}
-		
 		lua_pop(L, 2);
 	}
 
@@ -1149,17 +1102,7 @@ void TileCallback::onTileCombat(Creature* creature, Tile* tile) const
 {
 	//onTileCombat(creature, pos)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - TileCallback::onTileCombat"
-				<< " Creature " 
-				<< creature->getName() 
-				<< " type "
-				<< type
-				<< " on tile " 
-				<< "x:" << (tile->getPosition()).getX() << " "
-				<< "y:" << (tile->getPosition()).getY() << " "
-				<< "z:" << (tile->getPosition()).getZ() << " "
-				<< "] Call stack overflow. Too many lua script calls being nested." 
-				<< std::endl;
+		std::cout << "[Error - TileCallback::onTileCombat] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1189,10 +1132,7 @@ void TargetCallback::onTargetCombat(Creature* creature, Creature* target) const
 {
 	//onTargetCombat(creature, target)
 	if (!scriptInterface->reserveScriptEnv()) {
-		std::cout << "[Error - TargetCallback::onTargetCombat"
-				<< " Creature " 
-				<< creature->getName() 
-				<< "] Call stack overflow. Too many lua script calls being nested." << std::endl;
+		std::cout << "[Error - TargetCallback::onTargetCombat] Call stack overflow" << std::endl;
 		return;
 	}
 
@@ -1282,7 +1222,7 @@ void AreaCombat::getList(const Position& centerPos, const Position& targetPos, s
 	}
 }
 
-void AreaCombat::copyArea(const MatrixArea* input, MatrixArea* output, MatrixOperation_t op) const
+void AreaCombat::copyArea(const MatrixArea* input, MatrixArea* output, MatrixOperation_t op)
 {
 	uint32_t centerY, centerX;
 	input->getCenter(centerY, centerX);
@@ -1408,17 +1348,17 @@ void AreaCombat::setupArea(const std::list<uint32_t>& list, uint32_t rows)
 
 	//SOUTH
 	MatrixArea* southArea = new MatrixArea(maxOutput, maxOutput);
-	copyArea(area, southArea, MATRIXOPERATION_ROTATE180);
+	AreaCombat::copyArea(area, southArea, MATRIXOPERATION_ROTATE180);
 	areas[DIRECTION_SOUTH] = southArea;
 
 	//EAST
 	MatrixArea* eastArea = new MatrixArea(maxOutput, maxOutput);
-	copyArea(area, eastArea, MATRIXOPERATION_ROTATE90);
+	AreaCombat::copyArea(area, eastArea, MATRIXOPERATION_ROTATE90);
 	areas[DIRECTION_EAST] = eastArea;
 
 	//WEST
 	MatrixArea* westArea = new MatrixArea(maxOutput, maxOutput);
-	copyArea(area, westArea, MATRIXOPERATION_ROTATE270);
+	AreaCombat::copyArea(area, westArea, MATRIXOPERATION_ROTATE270);
 	areas[DIRECTION_WEST] = westArea;
 }
 
@@ -1508,17 +1448,17 @@ void AreaCombat::setupExtArea(const std::list<uint32_t>& list, uint32_t rows)
 
 	//NORTH-EAST
 	MatrixArea* neArea = new MatrixArea(maxOutput, maxOutput);
-	copyArea(area, neArea, MATRIXOPERATION_MIRROR);
+	AreaCombat::copyArea(area, neArea, MATRIXOPERATION_MIRROR);
 	areas[DIRECTION_NORTHEAST] = neArea;
 
 	//SOUTH-WEST
 	MatrixArea* swArea = new MatrixArea(maxOutput, maxOutput);
-	copyArea(area, swArea, MATRIXOPERATION_FLIP);
+	AreaCombat::copyArea(area, swArea, MATRIXOPERATION_FLIP);
 	areas[DIRECTION_SOUTHWEST] = swArea;
 
 	//SOUTH-EAST
 	MatrixArea* seArea = new MatrixArea(maxOutput, maxOutput);
-	copyArea(swArea, seArea, MATRIXOPERATION_MIRROR);
+	AreaCombat::copyArea(swArea, seArea, MATRIXOPERATION_MIRROR);
 	areas[DIRECTION_SOUTHEAST] = seArea;
 }
 
@@ -1532,6 +1472,14 @@ void MagicField::onStepInField(Creature* creature)
 			g_game.internalRemoveItem(this, 1);
 		}
 
+		return;
+	}
+
+	//remove magic walls/wild growth ( only nopvp tiles/world )
+	if (id == ITEM_MAGICWALL_NOPVP || id == ITEM_WILDGROWTH_NOPVP) {
+		if (g_game.getWorldType() == WORLD_TYPE_NO_PVP || getTile()->hasFlag(TILESTATE_NOPVPZONE)) {
+			g_game.internalRemoveItem(this, 1);
+		}
 		return;
 	}
 

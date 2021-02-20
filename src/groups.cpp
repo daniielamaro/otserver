@@ -46,7 +46,7 @@ const std::unordered_map<std::string, PlayerFlags> ParsePlayerFlagMap = {
 	{"cannotbebanned", PlayerFlag_CannotBeBanned},
 	{"cannotbepushed", PlayerFlag_CannotBePushed},
 	{"hasinfinitecapacity", PlayerFlag_HasInfiniteCapacity},
-	{"canpushallcreatures", PlayerFlag_CanPushAllCreatures},
+	{"cannotpushallcreatures", PlayerFlag_CanPushAllCreatures},
 	{"cantalkredprivate", PlayerFlag_CanTalkRedPrivate},
 	{"cantalkredchannel", PlayerFlag_CanTalkRedChannel},
 	{"talkorangehelpchannel", PlayerFlag_TalkOrangeHelpChannel},
@@ -57,16 +57,11 @@ const std::unordered_map<std::string, PlayerFlags> ParsePlayerFlagMap = {
 	{"setmaxspeed", PlayerFlag_SetMaxSpeed},
 	{"specialvip", PlayerFlag_SpecialVIP},
 	{"notgenerateloot", PlayerFlag_NotGenerateLoot},
-	{"cantalkredchannelanonymous", PlayerFlag_CanTalkRedChannelAnonymous},
 	{"ignoreprotectionzone", PlayerFlag_IgnoreProtectionZone},
 	{"ignorespellcheck", PlayerFlag_IgnoreSpellCheck},
 	{"ignoreweaponcheck", PlayerFlag_IgnoreWeaponCheck},
 	{"cannotbemuted", PlayerFlag_CannotBeMuted},
 	{"isalwayspremium", PlayerFlag_IsAlwaysPremium}
-};
-
-const std::unordered_map<std::string, PlayerCustomFlags> ParsePlayerCustomFlagMap = {
-  {"canmapclickteleport", PlayerCustomFlag_CanMapClickTeleport}
 };
 
 bool Groups::load()
@@ -89,7 +84,7 @@ bool Groups::load()
 		if (pugi::xml_node node = groupNode.child("flags")) {
 			for (auto flagNode : node.children()) {
 				pugi::xml_attribute attr = flagNode.first_attribute();
-				if (!attr || (attr && !attr.as_bool())) {
+				if (!attr || !attr.as_bool()) {
 					continue;
 				}
 
@@ -99,24 +94,9 @@ bool Groups::load()
 				}
 			}
 		}
-    group.customflags = pugi::cast<uint64_t>(groupNode.attribute("customflags").value());
-    if (pugi::xml_node node = groupNode.child("customflags")) {
-      for (auto customflagNode : node.children()) {
-				pugi::xml_attribute attr = customflagNode.first_attribute();
-				if (!attr || (attr && !attr.as_bool())) {
-					continue;
-				}
-
-				auto parseCustomFlag = ParsePlayerCustomFlagMap.find(attr.name());
-				if (parseCustomFlag != ParsePlayerCustomFlagMap.end()) {
-					group.customflags |= parseCustomFlag->second;
-				}
-			}
-		}
 
 		groups.push_back(group);
 	}
-	groups.shrink_to_fit();
 	return true;
 }
 

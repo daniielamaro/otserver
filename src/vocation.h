@@ -26,7 +26,7 @@
 class Vocation
 {
 	public:
-		explicit Vocation(uint16_t initId) : id(initId) {}
+		explicit Vocation(uint16_t id) : id(id) {}
 
 		const std::string& getVocName() const {
 			return name;
@@ -94,13 +94,10 @@ class Vocation
 	private:
 		friend class Vocations;
 
-		std::map<uint32_t, uint64_t> cacheMana;
-		std::map<uint32_t, uint32_t> cacheSkill[SKILL_LAST + 1];
-
 		std::string name = "none";
 		std::string description;
 
-		float skillMultipliers[SKILL_LAST + 1] = {1.5f, 2.0f, 2.0f, 2.0f, 2.0f, 1.5f, 1.1f};
+		double skillMultipliers[SKILL_LAST + 1] = {1.5, 2.0, 2.0, 2.0, 2.0, 1.5, 1.1};
 		float manaMultiplier = 4.0f;
 
 		uint32_t gainHealthTicks = 6;
@@ -119,8 +116,6 @@ class Vocation
 
 		uint8_t soulMax = 100;
 		uint8_t clientId = 0;
-
-		static uint32_t skillBase[SKILL_LAST + 1];
 };
 
 class Vocations
@@ -129,7 +124,6 @@ class Vocations
 		bool loadFromXml();
 
 		Vocation* getVocation(uint16_t id);
-    const std::map<uint16_t, Vocation>& getVocations() const {return vocationsMap;}
 		int32_t getVocationId(const std::string& name) const;
 		uint16_t getPromotedVocation(uint16_t vocationId) const;
 

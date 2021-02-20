@@ -27,10 +27,6 @@ class Inbox final : public Container
 	public:
 		explicit Inbox(uint16_t type);
 
-		void setMaxInboxItems(uint32_t maxitems) {
-			maxInboxItems = maxitems;
-		}
-
 		//cylinder implementations
 		ReturnValue queryAdd(int32_t index, const Thing& thing, uint32_t count,
 				uint32_t flags, Creature* actor = nullptr) const override;
@@ -47,8 +43,6 @@ class Inbox final : public Container
 		Cylinder* getRealParent() const override {
 			return parent;
 		}
-	private:
-		uint32_t maxInboxItems;
 };
 
 #endif

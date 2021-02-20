@@ -1,44 +1,18 @@
-# OTServ Brasil - Global Server
+forgottenserver [![Build Status](https://travis-ci.org/otland/forgottenserver.svg?branch=master)](https://travis-ci.org/otland/forgottenserver "Travis CI status") [![Build status](https://ci.appveyor.com/api/projects/status/599x38f3a0luessl?svg=true)](https://ci.appveyor.com/project/otland/forgottenserver "Download builds for Windows") [![Docker status](https://images.microbadger.com/badges/image/otland/forgottenserver.svg)](https://microbadger.com/images/otland/forgottenserver "Docker image status")
+===============
 
-## Builds
-[![Build status](https://ci.appveyor.com/api/projects/status/github/opentibiabr/otservbr-global?branch=develop&passingText=develop%20-%20OK&svg=true)](https://ci.appveyor.com/project/opentibiabr/otservbr-global "Download nightly builds for Windows")
-[![Build Status](https://travis-ci.org/opentibiabr/OTServBR-Global.svg?branch=develop)](https://travis-ci.org/opentibiabr/OTServBR-Global "Linux Build Status - Develop Branch")
-
-[![Build on MacOS](https://github.com/opentibiabr/otservbr-global/workflows/Build%20on%20MacOS/badge.svg)](https://github.com/opentibiabr/otservbr-global/actions?query=workflow%3A%22Build+on+MacOS%22)
-[![Build on Ubuntu](https://github.com/opentibiabr/otservbr-global/workflows/Build%20on%20Ubuntu/badge.svg)](https://github.com/opentibiabr/otservbr-global/actions?query=workflow%3A%22Build+on+Ubuntu%22)
-[![Build on Windows](https://github.com/opentibiabr/otservbr-global/workflows/Build%20on%20Windows/badge.svg)](https://github.com/opentibiabr/otservbr-global/actions?query=workflow%3A%22Build+on+Windows%22)
-
-## Docs/Help
-[![Documentation](https://codedocs.xyz/Costallat/otservbr-global.svg)](https://codedocs.xyz/Costallat/otservbr-global/)
-[![Discord Channel](https://img.shields.io/discord/528117503952551936.svg?label=discord)](https://discord.gg/3NxYnyV)
-
-## Project
-OTServ Brasil - Global Server is a free and open-source MMORPG server emulator written in C++. It is a fork of the [Forgotten Server](https://github.com/otland/forgottenserver) project. To connect to the server and to take a stable experience, you can use our [own client](https://forums.otserv.com.br/index.php?/forums/topic/167933-otservbr-global-cliente-tibia-12/) and if you want to edit something, check our [customized tools](https://github.com/opentibiabr/tools).
+The Forgotten Server is a free and open-source MMORPG server emulator written in C++. It is a fork of the [OpenTibia Server](https://github.com/opentibia/server) project. To connect to the server, you can use [OTClient](https://github.com/edubart/otclient).
 
 ### Getting Started
-* **WARNING: YOU NEED TO UNZIP THE MAP BEFORE START THE SERVER.**
-* [Compiling on Windows](https://forums.otserv.com.br/index.php?/forums/topic/169235-windowsvc2019-compilando-sources-otservbr-global/), alternatively download [nightly builds for Windows](https://ci.appveyor.com/project/opentibiabr/otservbr-global).
+
+* [Compiling](https://github.com/otland/forgottenserver/wiki/Compiling), alternatively download [AppVeyor builds for Windows](https://ci.appveyor.com/project/otland/forgottenserver)
+* [Scripting Reference](https://github.com/otland/forgottenserver/wiki/Script-Interface)
+* [Contributing](https://github.com/otland/forgottenserver/wiki/Contributing)
+
+### Support
+
+If you need help, please visit the [support forum on OTLand](https://otland.net/forums/support.16/). Our issue tracker is not a support forum, and using it as one will result in your issue being closed. If you were unable to get assistance in the support forum, you should consider [becoming a premium user on OTLand](https://otland.net/account/upgrades) which grants you access to the premium support forum and supports OTLand financially.
 
 ### Issues
-We use the [issue tracker on GitHub](https://github.com/opentibiabr/OTServBR-Global/issues). Keep in mind that everyone who is watching the repository gets notified by e-mail when there is an activity, so be thoughtful and avoid writing comments that aren't meant for an issue (e.g. "+1"). If you'd like for an issue to be fixed faster, you should either fix it yourself and submit a pull request, or place a bounty on the issue.
 
-### Special Thanks
-- our partners
-- our crew (majesty, gpedro, eduardo dantas)
-- our testers (raphaellb, petardako, szulcek and olimpotibia)
-- [our contributors](https://github.com/opentibiabr/OTServBR-Global/graphs/contributors)
-- [fear lucien](https://github.com/FearLucien)
-- [cjaker](https://github.com/Eternal-Scripts)
-- [slavidodo](https://github.com/slavidodo)
-- [mignari and our awesome tools](https://github.com/ottools)
-- [mattyx14/otxserver](https://github.com/mattyx14/otxserver) and contributors.
-- [otland/forgottenserver](https://github.com/otland/forgottenserver) and contributors.
-- if we forget someone, we apologize by forgot you. but you know, **forgot**tenserver.
-
-### Sponsors
-If you want to sponsor here, join on discord and send a message for one of our administrators.
-
-### Partners
-[![Supported by OTServ Brasil](https://forums.otserv.com.br/uploads/monthly_2018_05/otbr.png.9f34d819278e170c73dd155a0ca1b501.png)](https://forums.otserv.com.br)
-
-[![Protected by ServerCore](https://mktsc.servercore.com.br/protectedbyservercore.png)](https://bit.ly/1q2q4de)
+We use the [issue tracker on GitHub](https://github.com/otland/forgottenserver/issues). Keep in mind that everyone who is watching the repository gets notified by e-mail when there is activity, so be thoughtful and avoid writing comments that aren't meaningful for an issue (e.g. "+1"). If you'd like for an issue to be fixed faster, you should either fix it yourself and submit a pull request, or place a bounty on the issue.

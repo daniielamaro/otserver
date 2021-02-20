@@ -22,8 +22,6 @@
 
 #include <random>
 
-#include <regex>
-#include <boost/algorithm/string.hpp>
 #include "position.h"
 #include "const.h"
 #include "enums.h"
@@ -31,7 +29,7 @@
 void printXMLError(const std::string& where, const std::string& fileName, const pugi::xml_parse_result& result);
 
 std::string transformToSHA1(const std::string& input);
-std::string generateToken(const std::string& secret, uint32_t ticks);
+std::string generateToken(const std::string& key, uint32_t ticks);
 
 void replaceString(std::string& str, const std::string& sought, const std::string& replacement);
 void trim_right(std::string& source, char t);
@@ -72,16 +70,11 @@ Ammo_t getAmmoType(const std::string& strValue);
 WeaponAction_t getWeaponAction(const std::string& strValue);
 Skulls_t getSkullType(const std::string& strValue);
 std::string getCombatName(CombatType_t combatType);
-/**
- * @Deprecated
- * It will be dropped with monsters. Use RespawnPeriod_t instead.
- */
-SpawnType_t getSpawnType(const std::string& strValue);
-CombatType_t getCombatType(const std::string& combatname);
 
+std::string getSpecialSkillName(uint8_t skillid);
 std::string getSkillName(uint8_t skillid);
 
-uint32_t adlerChecksum(const uint8_t* data, size_t len);
+uint32_t adlerChecksum(const uint8_t* data, size_t length);
 
 std::string ucfirst(std::string str);
 std::string ucwords(std::string str);
@@ -99,31 +92,8 @@ itemAttrTypes stringToItemAttribute(const std::string& str);
 
 const char* getReturnMessage(ReturnValue value);
 
-void capitalizeWords(std::string &source);
-NameEval_t validateName(const std::string &name);
-
-bool isCaskItem(uint16_t itemId);
-
-std::string getObjectCategoryName(ObjectCategory_t category);
-
 int64_t OTSYS_TIME();
 
-SpellGroup_t stringToSpellGroup(std::string value);
-
-static inline Cipbia_Elementals_t getCipbiaElement(CombatType_t combatType) {
-	switch (combatType) {
-		case COMBAT_PHYSICALDAMAGE: return CIPBIA_ELEMENTAL_PHYSICAL;
-		case COMBAT_ENERGYDAMAGE: return CIPBIA_ELEMENTAL_ENERGY;
-		case COMBAT_EARTHDAMAGE: return CIPBIA_ELEMENTAL_EARTH;
-		case COMBAT_FIREDAMAGE: return CIPBIA_ELEMENTAL_FIRE;
-		case COMBAT_LIFEDRAIN: return CIPBIA_ELEMENTAL_LIFEDRAIN;
-		case COMBAT_HEALING: return CIPBIA_ELEMENTAL_HEALING;
-		case COMBAT_DROWNDAMAGE: return CIPBIA_ELEMENTAL_DROWN;
-		case COMBAT_ICEDAMAGE: return CIPBIA_ELEMENTAL_ICE;
-		case COMBAT_HOLYDAMAGE: return CIPBIA_ELEMENTAL_HOLY;
-		case COMBAT_DEATHDAMAGE: return CIPBIA_ELEMENTAL_DEATH;
-		default: return CIPBIA_ELEMENTAL_UNDEFINED;
-	}
-}
+SpellGroup_t stringToSpellGroup(const std::string& value);
 
 #endif

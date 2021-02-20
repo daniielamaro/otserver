@@ -60,12 +60,8 @@ bool Outfits::loadFromXml()
 			outfitNode.attribute("name").as_string(),
 			pugi::cast<uint16_t>(lookTypeAttribute.value()),
 			outfitNode.attribute("premium").as_bool(),
-			outfitNode.attribute("unlocked").as_bool(true),
-			outfitNode.attribute("from").as_string()
+			outfitNode.attribute("unlocked").as_bool(true)
 		);
-	}
-	for (uint8_t sex = PLAYERSEX_FEMALE; sex <= PLAYERSEX_LAST; ++sex) {
-		outfits[sex].shrink_to_fit();
 	}
 	return true;
 }
@@ -80,23 +76,12 @@ const Outfit* Outfits::getOutfitByLookType(PlayerSex_t sex, uint16_t lookType) c
 	return nullptr;
 }
 
-/**
- * Get the oposite sex equivalent outfit
- * @param sex current sex
- * @param lookType current looktype
- * @return <b>const</b> pointer to the outfit or <b>nullptr</b> if it could not be found.
- */
-
-const Outfit *Outfits::getOpositeSexOutfitByLookType(PlayerSex_t sex, uint16_t lookType)
+const Outfit* Outfits::getOutfitByLookType(uint16_t lookType) const
 {
-	PlayerSex_t	searchSex = (sex == PLAYERSEX_MALE)?PLAYERSEX_FEMALE:PLAYERSEX_MALE;
-
-	for(uint16_t i=0; i< outfits[sex].size(); i++) {
-		if (outfits[sex].at(i).lookType == lookType) {
-			if (outfits[searchSex].size()>i) {
-				return &outfits[searchSex].at(i);
-			} else { //looktype found but the oposite sex array doesn't have this index.
-				return nullptr;
+	for (uint8_t sex = PLAYERSEX_FEMALE; sex <= PLAYERSEX_LAST; sex++) {
+		for (const Outfit& outfit : outfits[sex]) {
+			if (outfit.lookType == lookType) {
+				return &outfit;
 			}
 		}
 	}

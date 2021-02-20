@@ -43,11 +43,9 @@ class OutputMessage : public NetworkMessage
 			add_header(info.length);
 		}
 
-		void addCryptoHeader(uint8_t addChecksum, uint32_t& sequence) {
-			if (addChecksum == 1) {
+		void addCryptoHeader(bool addChecksum) {
+			if (addChecksum) {
 				add_header(adlerChecksum(buffer + outputBufferStart, info.length));
-			} else if (addChecksum == 2) {
-				add_header(sequence++);
 			}
 
 			writeMessageLength();
@@ -69,10 +67,10 @@ class OutputMessage : public NetworkMessage
 
 	private:
 		template <typename T>
-		void add_header(T addHeader) {
+		void add_header(T add) {
 			assert(outputBufferStart >= sizeof(T));
 			outputBufferStart -= sizeof(T);
-			memcpy(buffer + outputBufferStart, &addHeader, sizeof(T));
+			memcpy(buffer + outputBufferStart, &add, sizeof(T));
 			//added header size to the message size
 			info.length += sizeof(T);
 		}
@@ -91,9 +89,6 @@ class OutputMessagePool
 			static OutputMessagePool instance;
 			return instance;
 		}
-
-		void sendAll();
-		void scheduleSendAll();
 
 		static OutputMessage_ptr getOutputMessage();
 

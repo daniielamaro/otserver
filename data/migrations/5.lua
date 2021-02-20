@@ -1,5 +1,5 @@
 function onUpdateDatabase()
-    print("> Updating database to version 6 (quickloot)")
-    db.query("ALTER TABLE `players` ADD `quickloot_fallback` TINYINT DEFAULT 0")
-    return true
+	print("> Updating database to version 6 (market bug fix)")
+	db.query("DELETE FROM `market_offers` WHERE `amount` = 0")
+	return true
 end

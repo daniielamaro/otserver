@@ -1,4 +1,3 @@
--- Functions from The Forgotten Server
 local foodCondition = Condition(CONDITION_REGENERATION, CONDITIONID_DEFAULT)
 
 function Player.feed(self, food)
@@ -37,20 +36,63 @@ function Player.hasFlag(self, flag)
 	return self:getGroup():hasFlag(flag)
 end
 
-function Player.hasCustomFlag(self, customflag)
-	return self:getGroup():hasCustomFlag(customflag)
+function Player.getLossPercent(self)
+	local blessings = 0
+	local lossPercent = {
+		[0] = 100,
+		[1] = 70,
+		[2] = 45,
+		[3] = 25,
+		[4] = 10,
+		[5] = 0
+	}
+
+	for i = 1, 5 do
+		if self:hasBlessing(i) then
+			blessings = blessings + 1
+		end
+	end
+	return lossPercent[blessings]
+end
+
+function Player.getPremiumTime(self)
+	return math.max(0, self:getPremiumEndsAt() - os.time())
+end
+
+function Player.setPremiumTime(self, seconds)
+	self:setPremiumEndsAt(os.time() + seconds)
+	return true
+end
+
+function Player.addPremiumTime(self, seconds)
+	self:setPremiumTime(self:getPremiumTime() + seconds)
+	return true
+end
+
+function Player.removePremiumTime(self, seconds)
+	local currentTime = self:getPremiumTime()
+	if currentTime < seconds then
+		return false
+	end
+
+	self:setPremiumTime(currentTime - seconds)
+	return true
+end
+
+function Player.getPremiumDays(self)
+	return math.floor(self:getPremiumTime() / 86400)
+end
+
+function Player.addPremiumDays(self, days)
+	return self:addPremiumTime(days * 86400)
+end
+
+function Player.removePremiumDays(self, days)
+	return self:removePremiumTime(days * 86400)
 end
 
 function Player.isPremium(self)
-	return self:getPremiumDays() > 0 or configManager.getBoolean(configKeys.FREE_PREMIUM)
-end
-
-function Player.isPromoted(self)
-	local vocation = self:getVocation()
-	local promotedVocation = vocation:getPromotion()
-	promotedVocation = promotedVocation and promotedVocation:getId() or 0
-
-	return promotedVocation == 0 and vocation:getId() ~= promotedVocation
+	return self:getPremiumTime() > 0 or configManager.getBoolean(configKeys.FREE_PREMIUM)
 end
 
 function Player.sendCancelMessage(self, message)
@@ -95,122 +137,87 @@ function Player.addManaSpent(...)
 	return ret
 end
 
--- Functions From OTServBR-Global
-function Player.getCookiesDelivered(self)
-	local storage, amount = {
-		Storage.WhatAFoolish.CookieDelivery.SimonTheBeggar, Storage.WhatAFoolish.CookieDelivery.Markwin, Storage.WhatAFoolish.CookieDelivery.Ariella,
-		Storage.WhatAFoolish.CookieDelivery.Hairycles, Storage.WhatAFoolish.CookieDelivery.Djinn, Storage.WhatAFoolish.CookieDelivery.AvarTar,
-		Storage.WhatAFoolish.CookieDelivery.OrcKing, Storage.WhatAFoolish.CookieDelivery.Lorbas, Storage.WhatAFoolish.CookieDelivery.Wyda,
-		Storage.WhatAFoolish.CookieDelivery.Hjaern
-	}, 0
-	for i = 1, #storage do
-		if self:getStorageValue(storage[i]) == 1 then
-			amount = amount + 1
-		end
-	end
-	return amount
-end
-
-function Player.allowMovement(self, allow)
-	return self:setStorageValue(STORAGE.blockMovementStorage, allow and -1 or 1)
-end
-
-function Player.checkGnomeRank(self)
-	local points = self:getStorageValue(Storage.BigfootBurden.Rank)
-	local questProgress = self:getStorageValue(Storage.BigfootBurden.QuestLine)
-	if points >= 30 and points < 120 then
-		if questProgress <= 25 then
-			self:setStorageValue(Storage.BigfootBurden.QuestLine, 26)
-			self:getPosition():sendMagicEffect(CONST_ME_MAGIC_BLUE)
-			self:addAchievement('Gnome Little Helper')
-		end
-	elseif points >= 120 and points < 480 then
-		if questProgress <= 26 then
-			self:setStorageValue(Storage.BigfootBurden.QuestLine, 27)
-			self:getPosition():sendMagicEffect(CONST_ME_MAGIC_BLUE)
-			self:addAchievement('Gnome Little Helper')
-			self:addAchievement('Gnome Friend')
-		end
-	elseif points >= 480 and points < 1440 then
-		if questProgress <= 27 then
-			self:setStorageValue(Storage.BigfootBurden.QuestLine, 28)
-			self:getPosition():sendMagicEffect(CONST_ME_MAGIC_BLUE)
-			self:addAchievement('Gnome Little Helper')
-			self:addAchievement('Gnome Friend')
-			self:addAchievement('Gnomelike')
-		end
-	elseif points >= 1440 then
-		if questProgress <= 29 then
-			self:setStorageValue(Storage.BigfootBurden.QuestLine, 30)
-			self:getPosition():sendMagicEffect(CONST_ME_MAGIC_BLUE)
-			self:addAchievement('Gnome Little Helper')
-			self:addAchievement('Gnome Friend')
-			self:addAchievement('Gnomelike')
-			self:addAchievement('Honorary Gnome')
-		end
-	end
-	return true
-end
-
-function Player.addFamePoint(self)
-	local points = self:getStorageValue(SPIKE_FAME_POINTS)
-	local current = math.max(0, points)
-	self:setStorageValue(SPIKE_FAME_POINTS, current + 1)
-	self:sendTextMessage(MESSAGE_EVENT_ADVANCE, "You have received a fame point.")
-end
-
-function Player.getFamePoints(self)
-	local points = self:getStorageValue(SPIKE_FAME_POINTS)
-	return math.max(0, points)
-end
-
-function Player.removeFamePoints(self, amount)
-	local points = self:getStorageValue(SPIKE_FAME_POINTS)
-	local current = math.max(0, points)
-	self:setStorageValue(SPIKE_FAME_POINTS, current - amount)
-end
-
-function Player.depositMoney(self, amount)
-	if not self:removeMoney(amount) then
+-- Always pass the number through the isValidMoney function first before using the transferMoneyTo
+function Player.transferMoneyTo(self, target, amount)
+	if not target then
 		return false
 	end
 
-	self:setBankBalance(self:getBankBalance() + amount)
-	return true
-end
-
-function Player.transferMoneyTo(self, target, amount)
+	-- See if you can afford this transfer
 	local balance = self:getBankBalance()
 	if amount > balance then
 		return false
 	end
 
-	local targetPlayer = Player(target)
+	-- See if player is online
+	local targetPlayer = Player(target.guid)
 	if targetPlayer then
-		local town = targetPlayer:getTown()
-		if town and town:getId() ~= TOWNS_LIST.DAWNPORT or town:getId() ~= TOWNS_LIST.DAWNPORT_TUTORIAL then -- Blocking transfer to Dawnport
-			targetPlayer:setBankBalance(targetPlayer:getBankBalance() + amount)
-		end
+		targetPlayer:setBankBalance(targetPlayer:getBankBalance() + amount)
 	else
-		if not playerExists(target) then
-			return false
-		end
-
-		local query_town = db.storeQuery('SELECT `town_id` FROM `players` WHERE `name` = ' .. db.escapeString(target) ..' LIMIT 1;')
-		if query_town ~= false then
-			local town = result.getDataInt(query_town, "town_id")
-			if town then
-				local town_id = Town(town) and Town(town):getId()
-				if town_id and town_id  == TOWNS_LIST.DAWNPORT or town_id == TOWNS_LIST.DAWNPORT_TUTORIAL then -- Blocking transfer to Dawnport
-					return false
-				end
-			end
-			result.free(consulta)
-			db.query("UPDATE `players` SET `balance` = `balance` + '" .. amount .. "' WHERE `name` = " .. db.escapeString(target))
-		end
+		db.query("UPDATE `players` SET `balance` = `balance` + " .. amount .. " WHERE `id` = '" .. target.guid .. "'")
 	end
 
 	self:setBankBalance(self:getBankBalance() - amount)
+	return true
+end
+
+function Player.canCarryMoney(self, amount)
+	-- Anyone can carry as much imaginary money as they desire
+	if amount == 0 then
+		return true
+	end
+
+	-- The 3 below loops will populate these local variables
+	local totalWeight = 0
+	local inventorySlots = 0
+
+	-- Add crystal coins to totalWeight and inventorySlots
+	local type_crystal = ItemType(ITEM_CRYSTAL_COIN)
+	local crystalCoins = math.floor(amount / 10000)
+	if crystalCoins > 0 then
+		amount = amount - (crystalCoins * 10000)
+		while crystalCoins > 0 do
+			local count = math.min(100, crystalCoins)
+			totalWeight = totalWeight + type_crystal:getWeight(count)
+			crystalCoins = crystalCoins - count
+			inventorySlots = inventorySlots + 1
+		end
+	end
+
+	-- Add platinum coins to totalWeight and inventorySlots
+	local type_platinum = ItemType(ITEM_PLATINUM_COIN)
+	local platinumCoins = math.floor(amount / 100)
+	if platinumCoins > 0 then
+		amount = amount - (platinumCoins * 100)
+		while platinumCoins > 0 do
+			local count = math.min(100, platinumCoins)
+			totalWeight = totalWeight + type_platinum:getWeight(count)
+			platinumCoins = platinumCoins - count
+			inventorySlots = inventorySlots + 1
+		end
+	end
+
+	-- Add gold coins to totalWeight and inventorySlots
+	local type_gold = ItemType(ITEM_GOLD_COIN)
+	if amount > 0 then
+		while amount > 0 do
+			local count = math.min(100, amount)
+			totalWeight = totalWeight + type_gold:getWeight(count)
+			amount = amount - count
+			inventorySlots = inventorySlots + 1
+		end
+	end
+
+	-- If player don't have enough capacity to carry this money
+	if self:getFreeCapacity() < totalWeight then
+		return false
+	end
+
+	-- If player don't have enough available inventory slots to carry this money
+	local backpack = self:getSlotItem(CONST_SLOT_BACKPACK)
+	if not backpack or backpack:getEmptySlots(true) < inventorySlots then
+		return false
+	end
 	return true
 end
 
@@ -224,104 +231,42 @@ function Player.withdrawMoney(self, amount)
 	return true
 end
 
-function Player.hasAllowMovement(self)
-	return self:getStorageValue(STORAGE.blockMovementStorage) ~= 1
-end
-
-function Player.hasRookgaardShield(self)
-	-- Wooden Shield, Studded Shield, Brass Shield, Plate Shield, Copper Shield
-	return self:getItemCount(2512) > 0
-		or self:getItemCount(2526) > 0
-		or self:getItemCount(2511) > 0
-		or self:getItemCount(2510) > 0
-		or self:getItemCount(2530) > 0
-end
-
-
-function Player.isSorcerer(self)
-	return table.contains({VOCATION.ID.SORCERER, VOCATION.ID.MASTER_SORCERER}, self:getVocation():getId())
-end
-
-function Player.isDruid(self)
-	return table.contains({VOCATION.ID.DRUID, VOCATION.ID.ELDER_DRUID}, self:getVocation():getId())
-end
-
-function Player.isKnight(self)
-	return table.contains({VOCATION.ID.KNIGHT, VOCATION.ID.ELITE_KNIGHT}, self:getVocation():getId())
-end
-
-function Player.isPaladin(self)
-	return table.contains({VOCATION.ID.PALADIN, VOCATION.ID.ROYAL_PALADIN}, self:getVocation():getId())
-end
-
-function Player.isMage(self)
-	return table.contains({VOCATION.ID.SORCERER, VOCATION.ID.MASTER_SORCERER, VOCATION.ID.DRUID, VOCATION.ID.ELDER_DRUID},
-		self:getVocation():getId())
-end
-
-local ACCOUNT_STORAGES = {}
-function Player.getAccountStorage(self, accountId, key, forceUpdate)
-	local accountId = self:getAccountId()
-	if ACCOUNT_STORAGES[accountId] and not forceUpdate then
-		return ACCOUNT_STORAGES[accountId]
+function Player.depositMoney(self, amount)
+	if not self:removeMoney(amount) then
+		return false
 	end
 
-	local query = db.storeQuery("SELECT `key`, MAX(`value`) as value FROM `player_storage` WHERE `player_id` IN (SELECT `id` FROM `players` WHERE `account_id` = ".. accountId ..") AND `key` = ".. key .." GROUP BY `key` LIMIT 1;")
-	if query ~= false then
-		local value = result.getDataInt(query, "value")
-		ACCOUNT_STORAGES[accountId] = value
-		result.free(query)
-		return value
-	end
-	return false
+	self:setBankBalance(self:getBankBalance() + amount)
+	return true
 end
 
-function Player.getMarriageDescription(thing)
-	local descr = ""
-	if getPlayerMarriageStatus(thing:getGuid()) == MARRIED_STATUS then
-		playerSpouse = getPlayerSpouse(thing:getGuid())
-		if self == thing then
-			descr = descr .. " You are "
-		elseif thing:getSex() == PLAYERSEX_FEMALE then
-			descr = descr .. " She is "
-		else
-			descr = descr .. " He is "
-		end
-		descr = descr .. "married to " .. getPlayerNameById(playerSpouse) .. '.'
+function Player.addLevel(self, amount, round)
+	local experience, level, amount = 0, self:getLevel(), amount or 1
+	if amount > 0 then
+		experience = getExperienceForLevel(level + amount) - (round and self:getExperience() or getExperienceForLevel(level))
+	else
+		experience = -((round and self:getExperience() or getExperienceForLevel(level)) - getExperienceForLevel(level + amount))
 	end
-	return descr
+	return self:addExperience(experience)
 end
 
-function Player.sendWeatherEffect(self, groundEffect, fallEffect, thunderEffect)
-    local position, random = self:getPosition(), math.random
-    position.x = position.x + random(-7, 7)
-      position.y = position.y + random(-5, 5)
-    local fromPosition = Position(position.x + 1, position.y, position.z)
-       fromPosition.x = position.x - 7
-       fromPosition.y = position.y - 5
-    local tile, getGround
-    for Z = 1, 7 do
-        fromPosition.z = Z
-        position.z = Z
-        tile = Tile(position)
-        if tile then -- If there is a tile, stop checking floors
-            fromPosition:sendDistanceEffect(position, fallEffect)
-			position:sendMagicEffect(groundEffect, self)
-			getGround = tile:getGround()
-            if getGround and ItemType(getGround:getId()):getFluidSource() == 1 then
-                position:sendMagicEffect(CONST_ME_LOSEENERGY, self)
-            end
-            break
-        end
-    end
-    if thunderEffect and tile and not tile:hasFlag(TILESTATE_PROTECTIONZONE) then
-        if random(2) == 1 then
-            local topCreature = tile:getTopCreature()
-            if topCreature and topCreature:isPlayer() and topCreature:getAccountType() < ACCOUNT_TYPE_SENIORTUTOR then
-                position:sendMagicEffect(CONST_ME_BIGCLOUDS, self)
-                doTargetCombatHealth(0, self, COMBAT_ENERGYDAMAGE, -weatherConfig.minDMG, -weatherConfig.maxDMG, CONST_ME_NONE)
-                --self:sendTextMessage(MESSAGE_STATUS_CONSOLE_BLUE, "You were hit by lightning and lost some health.")
-            end
-        end
-    end
+function Player.addMagicLevel(self, value)
+	return self:addManaSpent(self:getVocation():getRequiredManaSpent(self:getBaseMagicLevel() + value + 1) - self:getManaSpent())
+end
+
+function Player.addSkill(self, skillId, value, round)
+	if skillId == SKILL_LEVEL then
+		return self:addLevel(value, round)
+	elseif skillId == SKILL_MAGLEVEL then
+		return self:addMagicLevel(value)
+	end
+	return self:addSkillTries(skillId, self:getVocation():getRequiredSkillTries(skillId, self:getSkillLevel(skillId) + value) - self:getSkillTries(skillId))
+end
+
+function Player.getWeaponType()
+	local weapon = self:getSlotItem(CONST_SLOT_LEFT)
+	if weapon then
+		return ItemType(weapon:getId()):getWeaponType()
+	end
+	return WEAPON_NONE
 end
